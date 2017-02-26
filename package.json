@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "pulp build",
+    "test": "pulp build -I test/src --to test/app.js -m Test.Main"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "purescript-spork",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-prelude": "^2.1.0",
+    "purescript-console": "^2.0.0",
+    "purescript-tailrec": "^2.0.1",
+    "purescript-arrays": "^3.2.0",
+    "purescript-refs": "^2.0.0",
+    "purescript-foldable-traversable": "^2.1.0",
+    "purescript-maybe": "^2.0.1",
+    "purescript-aff": "^2.0.2",
+    "purescript-halogen-vdom": "^1.0.3",
+    "purescript-dom-indexed": "^1.0.0",
+    "purescript-unsafe-reference": "^1.0.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^2.0.0",
+    "purescript-dom-classy": "^1.3.0"
+  }
+}
