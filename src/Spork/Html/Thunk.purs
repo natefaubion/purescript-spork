@@ -17,7 +17,7 @@ import Halogen.VDom as V
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (reallyUnsafeRefEq)
 
-foreign import data TArg ∷ *
+foreign import data TArg ∷ Type
 
 data Thunk' f j i = Thunk' (f i → f j) (TArg → TArg → Boolean) (TArg → f i) TArg
 
