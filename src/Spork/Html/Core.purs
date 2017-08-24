@@ -125,7 +125,7 @@ instance stepValueToPropValue :: ToPropValue StepValue where
 instance wrapValueToPropValue :: ToPropValue WrapValue where
   toPropValue = P.propFromString <<< renderWrapValue
 
-newtype IProp (r ∷ # *) i = IProp (P.Prop i)
+newtype IProp (r ∷ # Type) i = IProp (P.Prop i)
 
 text ∷ ∀ i. String → Html i
 text = Html <<< V.Text
