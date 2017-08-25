@@ -5,7 +5,7 @@ import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
 import Data.Foreign (Foreign, toForeign, F)
 import Data.Foreign (readBoolean, readInt, readString) as F
-import Data.Foreign.Index (prop) as F
+import Data.Foreign.Index (readProp) as F
 import Data.Maybe (Maybe(..))
 import DOM.Event.Types (Event, MouseEvent, KeyboardEvent, FocusEvent)
 import DOM.HTML.Event.Types (DragEvent)
@@ -130,8 +130,8 @@ type ForeignDecoder a = Foreign → F a
 
 currentTargetValue ∷ ForeignDecoder String
 currentTargetValue =
-  F.prop "currentTarget"
-  >=> F.prop "value"
+  F.readProp "currentTarget"
+  >=> F.readProp "value"
   >=> F.readString
 
 foreignHandler ∷ ∀ a r i. ForeignDecoder a → String → (a → Maybe i) → IProp r i
@@ -152,14 +152,14 @@ onSelectedIndexChange ∷ ∀ r i. (Int → Maybe i) → IProp (selectedIndex �
 onSelectedIndexChange = foreignHandler decoder "change"
   where
     decoder =
-      F.prop "currentTarget"
-      >=> F.prop "selectedIndex"
+      F.readProp "currentTarget"
+      >=> F.readProp "selectedIndex"
       >=> F.readInt
 
 onChecked ∷ ∀ r i. (Boolean → Maybe i) → IProp (checked ∷ Boolean, onChange ∷ Event | r) i
 onChecked = foreignHandler decoder "change"
   where
     decoder =
-      F.prop "currentTarget"
-      >=> F.prop "checked"
+      F.readProp "currentTarget"
+      >=> F.readProp "checked"
       >=> F.readBoolean

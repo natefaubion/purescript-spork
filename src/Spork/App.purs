@@ -44,13 +44,12 @@ import Data.Functor.Coproduct (Coproduct(..), coproduct, left, right)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid (class Monoid, mempty)
 import Data.Newtype (unwrap)
-import Data.Nullable (toMaybe)
 import Data.Tuple (Tuple(..), curry)
 import DOM (DOM)
 import DOM.HTML (window) as DOM
 import DOM.HTML.Types (htmlDocumentToDocument, htmlDocumentToParentNode) as DOM
 import DOM.HTML.Window (document) as DOM
-import DOM.Node.ParentNode (querySelector) as DOM
+import DOM.Node.ParentNode (QuerySelector(..), querySelector) as DOM
 import DOM.Node.Node (appendChild) as DOM
 import DOM.Node.Types (Node, elementToNode) as DOM
 import Halogen.VDom as V
@@ -90,7 +89,7 @@ purely = { model: _, effects: mempty }
 type AppEffects eff =
   ( dom ∷ DOM
   , ref ∷ REF
-  , err ∷ EXCEPTION
+  , exception ∷ EXCEPTION
   | eff
   )
 
@@ -203,7 +202,7 @@ run app (Interpreter interpret) el = runEventQueue \push →
         , buildAttributes: P.buildProp push
         }
     vmach ← V.buildVDom spec (unwrap (app.render app.init.model))
-    DOM.appendChild (Machine.extract vmach) el
+    _ ← DOM.appendChild (Machine.extract vmach) el
     runInterpreter (unBatch app.init.effects) (unBatch (app.subs app.init.model))
     pure (Step (tick false vmach app.init.model))
 
@@ -216,8 +215,8 @@ runWithSelector
 runWithSelector app interpret sel = do
   win ← DOM.window
   doc ← DOM.document win
-  bod ← DOM.querySelector sel (DOM.htmlDocumentToParentNode doc)
-  case toMaybe bod of
+  bod ← DOM.querySelector (DOM.QuerySelector sel) (DOM.htmlDocumentToParentNode doc)
+  case bod of
     Nothing → throwException (error ("Element does not exist: " <> sel))
     Just el → run app interpret (DOM.elementToNode el)
 
