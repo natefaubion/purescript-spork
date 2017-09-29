@@ -36,7 +36,7 @@ import Control.Monad.Eff.Ref (REF, newRef, writeRef, readRef)
 import Control.Monad.Rec.Class as MR
 import Data.Array as Array
 import Data.Const (Const)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Foldable (for_, traverse_)
 import Data.Function.Uncurried (runFn2)
 import Data.Functor.Compose (Compose(..))
@@ -271,4 +271,4 @@ basicAff ∷ ∀ eff i. (Error → Eff eff Unit) → InterpreterSpec eff (Aff ef
 basicAff = toBasicAff id
 
 toBasicAff ∷ ∀ eff f i. (f ~> Aff eff) → (Error → Eff eff Unit) → InterpreterSpec eff f (Const Void) Unit i
-toBasicAff nat = basicInterpreter <<< \a b c → void (runAff a b (nat c))
+toBasicAff nat = basicInterpreter <<< \a b c → void (runAff (either a b) (nat c))
