@@ -14,6 +14,7 @@ module Spork.Html.Core
   , lazy
   , lazy2
   , lazy3
+  , memoized
   , empty
   , when
   , module Exports
@@ -45,7 +46,7 @@ import DOM.Node.Types (Element) as DOM
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.DOM.Prop (ElemRef(..)) as Exports
-import Spork.Html.Thunk (Thunk, thunk1, thunk2, thunk3)
+import Spork.Html.Thunk (Thunk, thunked, thunk1, thunk2, thunk3)
 import Unsafe.Coerce (unsafeCoerce)
 
 type HtmlV i = V.VDom (Array (P.Prop i)) (Thunk Html i)
@@ -164,6 +165,9 @@ lazy2 f a b = Html (V.Widget (Fn.runFn3 thunk2 f a b))
 
 lazy3 ∷ ∀ a b c i. (a → b → c → Html i) → a → b → c → Html i
 lazy3 f a b c = Html (V.Widget (Fn.runFn4 thunk3 f a b c))
+
+memoized ∷ ∀ a i. (a → a → Boolean) → (a → Html i) → a → Html i
+memoized eqFn f = Html <<< V.Widget <$> thunked eqFn f
 
 empty ∷ ∀ i. Html i
 empty = text ""
