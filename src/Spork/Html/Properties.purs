@@ -117,7 +117,7 @@ src ∷ ∀ r i. String → IProp (src ∷ String | r) i
 src = Html.prop "src"
 
 style ∷ ∀ r i. String → IProp (style ∷ String | r) i
-style = Html.prop "style"
+style = Html.attr "style"
 
 styles ∷ ∀ r i. Array Style → IProp (style ∷ String | r) i
 styles = style <<< String.joinWith ";" <<< map \(Style prop val) → prop <> ":" <> val
