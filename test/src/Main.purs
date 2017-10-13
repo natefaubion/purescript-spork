@@ -1,20 +1,21 @@
 module Test.Main where
 
 import Prelude
+
 import Control.Monad.Eff (Eff)
 import Control.MonadZero (guard)
+import DOM (DOM)
+import DOM.Classy.Element (fromElement) as DOM
+import DOM.Event.KeyboardEvent (key) as DOM
+import DOM.Event.Types (KeyboardEvent) as DOM
+import DOM.HTML.HTMLElement (focus) as DOM
+import DOM.Node.Types (Element) as DOM
 import Data.Array as Array
 import Data.Const (Const)
 import Data.Foldable as F
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Tuple (Tuple(..))
-import DOM (DOM)
-import DOM.Classy.Element (fromElement) as DOM
-import DOM.Event.Types (KeyboardEvent) as DOM
-import DOM.Event.KeyboardEvent (key) as DOM
-import DOM.HTML.HTMLElement (focus) as DOM
-import DOM.Node.Types (Element) as DOM
 import Spork.App as App
 import Spork.Html as H
 import Spork.Html.Elements.Keyed as K
