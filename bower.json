@@ -16,9 +16,8 @@
     "purescript-maybe": "^3.0.0",
     "purescript-aff": "^4.0.0",
     "purescript-halogen-vdom": "^2.0.0",
-    "purescript-dom-indexed": "^3.0.0",
-    "purescript-unsafe-reference": "^2.0.0",
-    "purescript-exists": "^3.0.0"
+    "purescript-dom-indexed": "^4.0.0",
+    "purescript-unsafe-reference": "^2.0.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0",
