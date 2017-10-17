@@ -8,17 +8,24 @@ import DOM (DOM)
 import DOM.Classy.Element (fromElement) as DOM
 import DOM.Event.KeyboardEvent (key) as DOM
 import DOM.Event.Types (KeyboardEvent) as DOM
+import DOM.HTML (window) as DOM
 import DOM.HTML.HTMLElement (focus) as DOM
+import DOM.HTML.Window (localStorage) as DOM
 import DOM.Node.Types (Element) as DOM
+import DOM.WebStorage.Storage (getItem, setItem) as DOM
 import Data.Array as Array
 import Data.Const (Const)
+import Data.Either (hush)
 import Data.Foldable as F
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Tuple (Tuple(..))
+import Routing (hashes)
+import Simple.JSON (readJSON, writeJSON)
 import Spork.App as App
 import Spork.Html as H
 import Spork.Html.Elements.Keyed as K
+import Spork.Interpreter (toBasicEff)
 
 type Model =
   { todos ∷ Array Todo
@@ -74,6 +81,12 @@ newTodo = { text: _, id: _, completed: false, editing: false }
 modifyWhere ∷ forall f a. Functor f ⇒ (a → Boolean) → (a → a) → f a → f a
 modifyWhere pred mod = map (\a → if pred a then mod a else a)
 
+toStorage ∷ Model → App.Transition Effect Model Action
+toStorage model =
+  { model
+  , effects: App.exec (WriteStorage model None)
+  }
+
 update ∷ Model → Action → App.Transition Effect Model Action
 update model = case _ of
   None →
@@ -89,7 +102,7 @@ update model = case _ of
           then model.todos
           else Array.snoc model.todos (newTodo model.pending model.fresh)
     in
-      App.purely $ model
+      toStorage $ model
         { pending = ""
         , todos = todos'
         , fresh = model.fresh + 1
@@ -102,7 +115,7 @@ update model = case _ of
           # modifyWhere (eq todo <<< _.id)
           _ { text = text }
     in
-      App.purely $ model { todos = todos' }
+      toStorage $ model { todos = todos' }
 
   ToggleTodo todo checked →
     let
@@ -111,7 +124,7 @@ update model = case _ of
           # modifyWhere (eq todo <<< _.id)
           _ { completed = checked }
     in
-      App.purely $ model { todos = todos' }
+      toStorage $ model { todos = todos' }
 
   EditingTodo todo editing →
     let
@@ -120,7 +133,7 @@ update model = case _ of
           # modifyWhere (eq todo <<< _.id)
           _ { editing = editing }
     in
-      App.purely $ model { todos = todos' }
+      toStorage $ model { todos = todos' }
 
   DeleteTodo todo →
     let
@@ -128,7 +141,7 @@ update model = case _ of
         model.todos
           # Array.filter (not eq todo <<< _.id)
     in
-      App.purely $ model { todos = todos' }
+      toStorage $ model { todos = todos' }
 
   DeleteCompleted →
     let
@@ -136,7 +149,7 @@ update model = case _ of
         model.todos
           # Array.filter (not _.completed)
     in
-      App.purely $ model { todos = todos' }
+      toStorage $ model { todos = todos' }
 
   ToggleAll checked →
     let
@@ -144,7 +157,7 @@ update model = case _ of
         model.todos
           # map _ { completed = checked }
     in
-      App.purely $ model { todos = todos' }
+      toStorage $ model { todos = todos' }
 
   ChangeVisibility visibility →
     App.purely $  model { visibility = visibility }
@@ -303,21 +316,26 @@ renderFilters ∷ Visibility → H.Html Action
 renderFilters visibility =
   H.ul
     [ H.classes [ "filters" ] ]
-    [ visibilityLink "#/" All visibility
-    , visibilityLink "#/active" Active visibility
-    , visibilityLink "#/completed" Completed visibility
+    [ visibilityLink All visibility
+    , visibilityLink Active visibility
+    , visibilityLink Completed visibility
     ]
 
-visibilityLink ∷ String → Visibility → Visibility → H.Html Action
-visibilityLink link v1 v2 =
-  H.li
-    [ H.onClick (H.always_ (ChangeVisibility v1)) ]
+visibilityLink ∷ Visibility → Visibility → H.Html Action
+visibilityLink v1 v2 =
+  H.li []
     [ H.a
         [ H.classes ("selected" <$ guard (v1 == v2))
-        , H.href link
+        , H.href (visibilityHref v1)
         ]
         [ H.text (show v1) ]
     ]
+
+visibilityHref ∷ Visibility → String
+visibilityHref = case _ of
+  All       → "#/"
+  Active    → "#/active"
+  Completed → "#/completed"
 
 renderClear ∷ Int → H.Html Action
 renderClear len =
@@ -355,16 +373,28 @@ styleHidden =
     then H.styles [ H.Style "visibility" "hidden" ]
     else H.styles [ H.Style "visibility" "visibility" ]
 
-app ∷ App.App Effect (Const Void) Model Action
-app =
+app ∷ Maybe StoredModel → App.App Effect (Const Void) Model Action
+app storedModel =
   { render
   , update
   , subs: const mempty
-  , init:
-      { model: initialModel
-      , effects: mempty
-      }
+  , init: App.purely model
   }
+  where
+  model = case storedModel of
+    Nothing → initialModel
+    Just sm → initialModel
+      { todos = sm.todos
+      , fresh = sm.fresh
+      }
+
+type StoredModel =
+  { todos ∷ Array Todo
+  , fresh ∷ Int
+  }
+
+storageKey ∷ String
+storageKey = "todos"
 
 data Effect a
   = Focus DOM.Element a
@@ -378,9 +408,36 @@ runEffect = case _ of
     F.for_ (DOM.fromElement el) DOM.focus
     pure next
   WriteStorage model next → do
+    let
+      storedModel =
+        { todos: model.todos
+        , fresh: model.fresh
+        }
+    DOM.window
+      >>= DOM.localStorage
+      >>= DOM.setItem storageKey (writeJSON storedModel)
     pure next
+
+routeAction ∷ String → Maybe Action
+routeAction = case _ of
+  "/"          → Just $ ChangeVisibility All
+  "/active"    → Just $ ChangeVisibility Active
+  "/completed" → Just $ ChangeVisibility Completed
+  _            → Nothing
 
 main ∷ Eff (App.AppEffects ()) Unit
 main = do
-  interpreter ← App.makeInterpreter $ App.toBasicEff runEffect
-  void $ App.runWithSelector app interpreter "#app"
+  storedModel ←
+    DOM.window
+      >>= DOM.localStorage
+      >>= DOM.getItem storageKey
+      >>> map (_ >>= readJSON >>> hush)
+
+  driver ←
+    App.runWithSelector
+      (toBasicEff runEffect)
+      (app storedModel)
+      "#app"
+
+  hashes \oldHash newHash →
+    F.for_ (routeAction newHash) driver
