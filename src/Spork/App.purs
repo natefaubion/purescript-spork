@@ -10,8 +10,8 @@ module Spork.App
   , exec
   , subscribe
   , purely
-  , run
-  , runWithSelector
+  , make
+  , makeWithSelector
   , module Exports
   ) where
 
@@ -19,7 +19,7 @@ import Prelude
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (EXCEPTION, throwException, error)
-import Control.Monad.Eff.Ref (REF)
+import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef, modifyRef)
 import DOM (DOM)
 import DOM.HTML (window) as DOM
 import DOM.HTML.Types (htmlDocumentToDocument, htmlDocumentToParentNode) as DOM
@@ -28,17 +28,17 @@ import DOM.Node.Node (appendChild) as DOM
 import DOM.Node.ParentNode (QuerySelector(..), querySelector) as DOM
 import DOM.Node.Types (Node, elementToNode) as DOM
 import Data.Const (Const)
-import Data.Either (Either(..))
-import Data.Foldable (traverse_)
+import Data.Foldable (for_, traverse_)
 import Data.Functor.Compose (Compose(..))
 import Data.Functor.Coproduct (Coproduct, left, right)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (class Monoid, mempty)
 import Data.Newtype (unwrap)
+import Data.StrMap as SM
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.Machine as Machine
-import Spork.EventQueue (EventQueue, Loop(..), looped, makeEventQueue, runEventQueue)
+import Spork.EventQueue (EventQueue, Loop(..), looped, fromEventQueueSpec, makeEventQueue)
 import Spork.EventQueue (Push) as Exports
 import Spork.Html (Html)
 import Spork.Html.Thunk (buildThunk)
@@ -95,23 +95,42 @@ type PureApp s i = App (Const Void) (Const Void) s i
 
 type BasicApp m s i = App m (Const Void) s i
 
-makeApp
+type AppInstance eff s i =
+  { push ∷ i → Eff eff Unit
+  , restore ∷ s → Eff eff Unit
+  , subscribe ∷ (AppChange s i → Eff eff Unit) → Eff eff (Eff eff Unit)
+  , run ∷ Eff eff Unit
+  }
+
+type AppChange s i =
+  { old ∷ s
+  , action ∷ i
+  , new ∷ s
+  }
+
+data AppAction m s i
+  = Restore s
+  | Action i
+  | Interpret m
+
+makeAppQueue
   ∷ ∀ eff m q s i
   . Functor m
   ⇒ Functor q
-  ⇒ (Interpreter (AppEffects eff) m q)
+  ⇒ (AppChange s i → Eff (AppEffects eff) Unit)
+  → (Interpreter (AppEffects eff) m q)
   → App m q s i
   → DOM.Node
-  → EventQueue (Eff (AppEffects eff)) (Either (Coproduct m q (Eff (AppEffects eff) Unit)) i)
-makeApp (Interpreter interpreter) app el = makeEventQueue \push →
+  → EventQueue (Eff (AppEffects eff)) (AppAction (Coproduct m q (Eff (AppEffects eff) Unit)) s i)
+makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \push →
   let
-    pushInput = push <<< Right
-    pushEffect = push <<< Left <<< left
-    pushSub = push <<< Left <<< right
+    pushAction = push <<< Action
+    pushEffect = push <<< Interpret <<< left
+    pushSub = push <<< Interpret <<< right
 
     queueInterp effs subs = do
-      traverse_ (pushEffect <<< map pushInput) $ unBatch effs
-      traverse_ (pushSub <<< map pushInput) $ unBatch subs
+      traverse_ (pushEffect <<< map pushAction) $ unBatch effs
+      traverse_ (pushSub <<< map pushAction) $ unBatch subs
 
     init = do
       document ←
@@ -122,11 +141,11 @@ makeApp (Interpreter interpreter) app el = makeEventQueue \push →
         vdomSpec = V.VDomSpec
           { document
           , buildWidget: buildThunk unwrap
-          , buildAttributes: P.buildProp pushInput
+          , buildAttributes: P.buildProp pushAction
           }
       vdom ← V.buildVDom vdomSpec (unwrap (app.render app.init.model))
       void $ DOM.appendChild (Machine.extract vdom) el
-      interpret ← looped <$> interpreter (push <<< Left)
+      interpret ← looped <$> interpreter (push <<< Interpret)
       queueInterp app.init.effects (app.subs app.init.model)
       pure
         { model: app.init.model
@@ -136,15 +155,22 @@ makeApp (Interpreter interpreter) app el = makeEventQueue \push →
         }
 
     tick state@{ interpret: Loop k _ } = case _ of
-      Left i → do
-        nextInterpret ← k i
+      Interpret m → do
+        nextInterpret ← k m
         pure $ state { interpret = nextInterpret }
-      Right i → do
+      Action i → do
         let
           next = app.update state.model i
           needsRender = state.needsRender || not (unsafeRefEq state.model next.model)
           nextState = state { model = next.model, needsRender = needsRender }
+          appChange = { old: state.model, action: i, new: next.model }
+        onChange appChange
         queueInterp next.effects (app.subs next.model)
+        pure nextState
+      Restore nextModel → do
+        let
+          needsRender = state.needsRender || not (unsafeRefEq state.model nextModel)
+          nextState = state { model = nextModel, needsRender = needsRender }
         pure nextState
 
     flush state = do
@@ -164,28 +190,57 @@ makeApp (Interpreter interpreter) app el = makeEventQueue \push →
   in
     { init, tick, flush }
 
-run
+make
   ∷ ∀ eff m q s i
   . Functor m
   ⇒ Functor q
   ⇒ (Interpreter (AppEffects eff) m q)
   → App m q s i
   → DOM.Node
-  → Eff (AppEffects eff) (i → Eff (AppEffects eff) Unit)
-run interpreter app = map (_ <<< Right) <<< runEventQueue <<< makeApp interpreter app
+  → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)
+make interpreter app el = do
+  subsRef ← newRef { fresh: 0, cbs: SM.empty }
+  let
+    onChange appChange = do
+      subs ← readRef subsRef
+      for_ subs.cbs (_ $ appChange)
 
-runWithSelector
+    subscribe cb = do
+      subs ← readRef subsRef
+      let key = show subs.fresh
+      writeRef subsRef
+        { fresh: subs.fresh + 1
+        , cbs: SM.insert key cb subs.cbs
+        }
+      pure (remove key)
+
+    remove key =
+      modifyRef subsRef \subs → subs
+        { cbs = SM.delete key subs.cbs
+        }
+
+  { push, run } ←
+    makeEventQueue $ makeAppQueue onChange interpreter app el
+
+  pure
+    { push: push <<< Action
+    , restore: push <<< Restore
+    , subscribe
+    , run
+    }
+
+makeWithSelector
   ∷ ∀ eff m q s i
   . Functor m
   ⇒ Functor q
   ⇒ (Interpreter (AppEffects eff) m q)
   → App m q s i
   → String
-  → Eff (AppEffects eff) (i → Eff (AppEffects eff) Unit)
-runWithSelector interpret app sel = do
+  → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)
+makeWithSelector interpret app sel = do
   win ← DOM.window
   doc ← DOM.document win
   bod ← DOM.querySelector (DOM.QuerySelector sel) (DOM.htmlDocumentToParentNode doc)
   case bod of
     Nothing → throwException (error ("Element does not exist: " <> sel))
-    Just el → run interpret app  (DOM.elementToNode el)
+    Just el → make interpret app (DOM.elementToNode el)

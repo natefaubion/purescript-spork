@@ -433,11 +433,13 @@ main = do
       >>= DOM.getItem storageKey
       >>> map (_ >>= readJSON >>> hush)
 
-  driver ←
-    App.runWithSelector
+  inst ←
+    App.makeWithSelector
       (toBasicEff runEffect)
       (app storedModel)
       "#app"
 
   hashes \oldHash newHash →
-    F.for_ (routeAction newHash) driver
+    F.for_ (routeAction newHash) inst.push
+
+  inst.run

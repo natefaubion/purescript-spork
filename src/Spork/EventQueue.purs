@@ -4,10 +4,11 @@ module Spork.EventQueue
   , Loop(..)
   , EventQueue
   , EventQueueSpec
+  , EventQueueInstance
   , QueueEffects
   , Push
+  , fromEventQueueSpec
   , makeEventQueue
-  , runEventQueue
   , looped
   ) where
 
@@ -18,7 +19,7 @@ import Control.Monad.Eff.Ref (REF, newRef, writeRef, readRef)
 import Control.Monad.Rec.Class as MR
 import Data.Array as Array
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
 
 type Tick f m i = m (f m i)
@@ -44,11 +45,16 @@ type EventQueueSpec m s i =
   , flush ∷ s → m s
   }
 
-makeEventQueue
+type EventQueueInstance eff i =
+  { run ∷ Eff eff Unit
+  , push ∷ Push (Eff eff) i
+  }
+
+fromEventQueueSpec
   ∷ ∀ eff s i
   . (Push (Eff eff) i → EventQueueSpec (Eff eff) s i)
   → EventQueue (Eff eff) i
-makeEventQueue specFn push =
+fromEventQueueSpec specFn push =
   let
     spec ∷ EventQueueSpec (Eff eff) s i
     spec = specFn push
@@ -63,11 +69,11 @@ makeEventQueue specFn push =
   in
     Step <<< tick <$> spec.init
 
-runEventQueue
+makeEventQueue
   ∷ ∀ eff i
   . EventQueue (Eff (QueueEffects eff)) i
-  → Eff (QueueEffects eff) (Push (Eff (QueueEffects eff)) i)
-runEventQueue proc = do
+  → Eff (QueueEffects eff) (EventQueueInstance (QueueEffects eff) i)
+makeEventQueue proc = do
   queue   ← newRef Nothing
   machine ← newRef Nothing
 
@@ -85,10 +91,7 @@ runEventQueue proc = do
     start ∷ Eff (QueueEffects eff) Unit
     start = do
       step ← readRef machine
-      for_ step (loop <<< startLoop)
-
-    startLoop ∷ Step (Eff (QueueEffects eff)) i → Loop (Eff (QueueEffects eff)) i
-    startLoop (Step fn) = Loop fn (pure (Step fn))
+      for_ step (loop <<< looped)
 
     loop ∷ Loop (Eff (QueueEffects eff)) i → Eff (QueueEffects eff) Unit
     loop = MR.tailRecM \(Loop next done) → do
@@ -106,9 +109,12 @@ runEventQueue proc = do
               writeRef queue Nothing
               pure (MR.Done unit)
             else
-              pure (MR.Loop (startLoop step))
+              pure (MR.Loop (looped step))
 
-  step ← proc push
-  writeRef machine (Just step)
-  start
-  pure push
+    run ∷ Eff (QueueEffects eff) Unit
+    run = unlessM (isJust <$> readRef machine) do
+      step ← proc push
+      writeRef machine (Just step)
+      start
+
+  pure { run, push }
