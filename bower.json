@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0",
-    "purescript-dom-classy": "^2.1.0"
+    "purescript-dom-classy": "^2.1.0",
+    "purescript-simple-json": "^1.0.0",
+    "purescript-routing": "^6.1.1"
   }
 }
