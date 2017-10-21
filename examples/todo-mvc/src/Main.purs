@@ -1,4 +1,4 @@
-module Test.Main where
+module Todo.Main where
 
 import Prelude
 

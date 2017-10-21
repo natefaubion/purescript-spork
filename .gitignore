@@ -5,4 +5,4 @@
 /.psc*
 /.psa*
 /.vscode
-/test/app.js
+/examples/*/app.js
