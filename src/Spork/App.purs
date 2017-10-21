@@ -126,7 +126,7 @@ makeAppQueue
   . Functor m
   ⇒ Functor q
   ⇒ (AppChange s i → Eff (AppEffects eff) Unit)
-  → (Interpreter (AppEffects eff) m q)
+  → Interpreter (Coproduct m q) (Eff (AppEffects eff))
   → App m q s i
   → DOM.Node
   → EventQueue (Eff (AppEffects eff)) (AppAction (AppEffects eff) m q s i)
@@ -167,11 +167,11 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
         , vdom
         }
 
-    tick
+    update
       ∷ AppState (AppEffects eff) m q s i
       → AppAction (AppEffects eff) m q s i
       → Eff (AppEffects eff) (AppState (AppEffects eff) m q s i)
-    tick state@{ interpret: Loop k _ } = case _ of
+    update state@{ interpret: Loop k _ } = case _ of
       Interpret m → do
         nextInterpret ← k m
         pure $ state { interpret = nextInterpret }
@@ -190,10 +190,10 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
           nextState = state { model = nextModel, needsRender = needsRender }
         pure nextState
 
-    flush
+    commit
       ∷ AppState (AppEffects eff) m q s i
       → Eff (AppEffects eff) (AppState (AppEffects eff) m q s i)
-    flush state = do
+    commit state = do
       nextVDom ←
         if state.needsRender
           then Machine.step state.vdom (unwrap (app.render state.model))
@@ -208,13 +208,13 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
         , needsRender: false
         }
   in
-    { init, tick, flush }
+    { init, update, commit }
 
 make
   ∷ ∀ eff m q s i
   . Functor m
   ⇒ Functor q
-  ⇒ (Interpreter (AppEffects eff) m q)
+  ⇒ Interpreter (Coproduct m q) (Eff (AppEffects eff))
   → App m q s i
   → DOM.Node
   → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)
@@ -230,10 +230,10 @@ make interpreter app el = do
       subs ← readRef subsRef
       for_ subs.cbs (_ $ appChange)
 
-    subscribe
+    subscribe'
       ∷ (AppChange s i → Eff (AppEffects eff) Unit)
       → (Eff (AppEffects eff) (Eff (AppEffects eff) Unit))
-    subscribe cb = do
+    subscribe' cb = do
       subs ← readRef subsRef
       let key = show subs.fresh
       writeRef subsRef
@@ -257,7 +257,7 @@ make interpreter app el = do
     { push: push <<< Action
     , snapshot: readRef stateRef
     , restore: push <<< Restore
-    , subscribe
+    , subscribe: subscribe'
     , run
     }
 
@@ -265,7 +265,7 @@ makeWithSelector
   ∷ ∀ eff m q s i
   . Functor m
   ⇒ Functor q
-  ⇒ (Interpreter (AppEffects eff) m q)
+  ⇒ Interpreter (Coproduct m q) (Eff (AppEffects eff))
   → App m q s i
   → String
   → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)

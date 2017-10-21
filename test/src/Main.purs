@@ -25,7 +25,7 @@ import Simple.JSON (readJSON, writeJSON)
 import Spork.App as App
 import Spork.Html as H
 import Spork.Html.Elements.Keyed as K
-import Spork.Interpreter (toBasicEff)
+import Spork.Interpreter (liftNat, merge, never)
 
 type Model =
   { todos ∷ Array Todo
@@ -435,7 +435,7 @@ main = do
 
   inst ←
     App.makeWithSelector
-      (toBasicEff runEffect)
+      (liftNat runEffect `merge` never)
       (app storedModel)
       "#app"
 

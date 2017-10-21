@@ -41,8 +41,8 @@ looped step = Loop (unwrap step) (pure step)
 
 type EventQueueSpec m s i =
   { init ∷ m s
-  , tick ∷ s → i → m s
-  , flush ∷ s → m s
+  , update ∷ s → i → m s
+  , commit ∷ s → m s
   }
 
 type EventQueueInstance eff i =
@@ -59,15 +59,15 @@ fromEventQueueSpec specFn push =
     spec ∷ EventQueueSpec (Eff eff) s i
     spec = specFn push
 
-    tick ∷ s → i → Tick Loop (Eff eff) i
-    tick state input = do
-      nextState ← spec.tick state input
-      pure $ Loop (tick nextState) (flush nextState)
+    update ∷ s → i → Tick Loop (Eff eff) i
+    update state input = do
+      nextState ← spec.update state input
+      pure $ Loop (update nextState) (commit nextState)
 
-    flush ∷ s → Tick Step (Eff eff) i
-    flush state = Step <<< tick <$> spec.flush state
+    commit ∷ s → Tick Step (Eff eff) i
+    commit state = Step <<< update <$> spec.commit state
   in
-    Step <<< tick <$> spec.init
+    Step <<< update <$> spec.init
 
 makeEventQueue
   ∷ ∀ eff i
