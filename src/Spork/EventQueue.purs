@@ -1,15 +1,13 @@
 module Spork.EventQueue
-  ( Tick
-  , Step(..)
-  , Loop(..)
+  ( Loop(..)
   , EventQueue
   , EventQueueSpec
   , EventQueueInstance
   , QueueEffects
   , Push
+  , stepper
   , fromEventQueueSpec
   , makeEventQueue
-  , looped
   ) where
 
 import Prelude
@@ -18,26 +16,16 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF, newRef, writeRef, readRef)
 import Control.Monad.Rec.Class as MR
 import Data.Array as Array
-import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Foldable (traverse_)
+import Data.Maybe (Maybe(..), maybe)
 
-type Tick f m i = m (f m i)
-
-newtype Step m i = Step (i → Tick Loop m i)
-
-data Loop m i = Loop (i → Tick Loop m i) (Tick Step m i)
+data Loop m i = Loop (i → m (Loop m i)) (Unit → m (Loop m i))
 
 type Push m i = i → m Unit
 
-type EventQueue m i = Push m i → Tick Step m i
+type EventQueue m i = Push m i → m (Loop m i)
 
 type QueueEffects eff = (ref ∷ REF | eff)
-
-derive instance newtypeStep ∷ Newtype (Step m i) _
-
-looped ∷ ∀ m i. Applicative m ⇒ Step m i → Loop m i
-looped step = Loop (unwrap step) (pure step)
 
 type EventQueueSpec m s i =
   { init ∷ m s
@@ -50,6 +38,15 @@ type EventQueueInstance eff i =
   , push ∷ Push (Eff eff) i
   }
 
+stepper ∷ ∀ m i. Applicative m ⇒ (i → m Unit) → EventQueue m i
+stepper k = tick
+  where
+  tick ∷ ∀ a. a → m (Loop m i)
+  tick _ = pure (Loop loop tick)
+
+  loop ∷ i → m (Loop m i)
+  loop a = k a $> Loop loop tick
+
 fromEventQueueSpec
   ∷ ∀ eff s i
   . (Push (Eff eff) i → EventQueueSpec (Eff eff) s i)
@@ -59,15 +56,16 @@ fromEventQueueSpec specFn push =
     spec ∷ EventQueueSpec (Eff eff) s i
     spec = specFn push
 
-    update ∷ s → i → Tick Loop (Eff eff) i
-    update state input = do
-      nextState ← spec.update state input
-      pure $ Loop (update nextState) (commit nextState)
+    update ∷ s → i → Eff eff (Loop (Eff eff) i)
+    update state input = tick <$> spec.update state input
 
-    commit ∷ s → Tick Step (Eff eff) i
-    commit state = Step <<< update <$> spec.commit state
+    commit ∷ s → Unit → Eff eff (Loop (Eff eff) i)
+    commit state _ = tick <$> spec.commit state
+
+    tick ∷ s → Loop (Eff eff) i
+    tick nextState = Loop (update nextState) (commit nextState)
   in
-    Step <<< update <$> spec.init
+    tick <$> spec.init
 
 makeEventQueue
   ∷ ∀ eff i
@@ -84,14 +82,12 @@ makeEventQueue proc = do
       case q of
         Nothing → do
           writeRef queue (Just [i])
-          start
+          run
         Just is →
           writeRef queue (Just (Array.snoc is i))
 
-    start ∷ Eff (QueueEffects eff) Unit
-    start = do
-      step ← readRef machine
-      for_ step (loop <<< looped)
+    run ∷ Eff (QueueEffects eff) Unit
+    run = traverse_ loop =<< readRef machine
 
     loop ∷ Loop (Eff (QueueEffects eff)) i → Eff (QueueEffects eff) Unit
     loop = MR.tailRecM \(Loop next done) → do
@@ -101,7 +97,7 @@ makeEventQueue proc = do
           writeRef queue (Just tail)
           MR.Loop <$> next head
         Nothing → do
-          step ← done
+          step ← done unit
           isEmpty ← maybe true Array.null <$> readRef queue
           if isEmpty
             then do
@@ -109,12 +105,8 @@ makeEventQueue proc = do
               writeRef queue Nothing
               pure (MR.Done unit)
             else
-              pure (MR.Loop (looped step))
+              pure (MR.Loop step)
 
-    run ∷ Eff (QueueEffects eff) Unit
-    run = unlessM (isJust <$> readRef machine) do
-      step ← proc push
-      writeRef machine (Just step)
-      start
-
+  step ← proc push
+  writeRef machine (Just step)
   pure { run, push }

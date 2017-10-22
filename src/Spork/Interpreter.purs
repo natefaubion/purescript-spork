@@ -15,10 +15,10 @@ import Control.Monad.Aff (Aff, runAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error)
 import Data.Const (Const)
-import Data.Either (Either(..), either)
-import Data.Functor.Coproduct (Coproduct(..), left, right)
+import Data.Either (either)
+import Data.Functor.Coproduct (Coproduct, coproduct, left, right)
 import Data.Newtype (unwrap)
-import Spork.EventQueue (EventQueue, Loop(..), Step(..), Tick, looped)
+import Spork.EventQueue (EventQueue, Loop(..), stepper)
 
 newtype Interpreter f m = Interpreter (EventQueue m (f (m Unit)))
 
@@ -30,42 +30,42 @@ merge
   → Interpreter (Coproduct f g) m
 merge (Interpreter lhs) (Interpreter rhs) = Interpreter \push →
   let
+    tick
+      ∷ Loop m (f (m Unit))
+      → Loop m (g (m Unit))
+      → Loop m (Coproduct f g (m Unit))
+    tick l r = Loop (update l r) (commit l r)
+
     update
       ∷ Loop m (f (m Unit))
       → Loop m (g (m Unit))
       → Coproduct f g (m Unit)
-      → Tick Loop m (Coproduct f g (m Unit))
-    update l@(Loop loopL _) r@(Loop loopR _) (Coproduct i) = case i of
-      Left iL → loopL iL <#> \nextL → Loop (update nextL r) (commit nextL r)
-      Right iR → loopR iR <#> \nextR → Loop (update l nextR) (commit l nextR)
+      → m (Loop m (Coproduct f g (m Unit)))
+    update l@(Loop loopL _) r@(Loop loopR _) =
+      coproduct
+        (map (flip tick r) <<< loopL)
+        (map (tick l) <<< loopR)
 
     commit
       ∷ Loop m (f (m Unit))
       → Loop m (g (m Unit))
-      → Tick Step m (Coproduct f g (m Unit))
-    commit (Loop _ commitL) (Loop _ commitR) =
-      map Step $ update
-        <$> map looped commitL
-        <*> map looped commitR
+      → Unit
+      → m (Loop m (Coproduct f g (m Unit)))
+    commit (Loop _ commitL) (Loop _ commitR) _ =
+      tick <$> commitL unit <*> commitR unit
   in
-    map Step $ update
-      <$> (map looped $ lhs $ push <<< left)
-      <*> (map looped $ rhs $ push <<< right)
+    tick
+      <$> lhs (push <<< left)
+      <*> rhs (push <<< right)
 
 never ∷ ∀ m. Applicative m ⇒ Interpreter (Const Void) m
-never = Interpreter (const (pure (Step (absurd <<< unwrap))))
+never = Interpreter (stepper (absurd <<< unwrap))
 
 liftCont ∷ ∀ f m. Applicative m ⇒ (f (m Unit) → m Unit) → Interpreter f m
-liftCont k = Interpreter (const (pure (Step loop)))
-  where
-  loop ∷ f (m Unit) → Tick Loop m (f (m Unit))
-  loop a = k a $> Loop loop (pure (Step loop))
+liftCont = Interpreter <<< stepper
 
 liftNat ∷  ∀ f m. Monad m ⇒ (f ~> m) → Interpreter f m
-liftNat k = Interpreter (const (pure (Step loop)))
-  where
-  loop ∷ f (m Unit) → Tick Loop m (f (m Unit))
-  loop a = join (k a) $> Loop loop (pure (Step loop))
+liftNat k = Interpreter (stepper (join <<< k))
 
 basicEff ∷ ∀ eff. Interpreter (Eff eff) (Eff eff)
 basicEff = liftNat id

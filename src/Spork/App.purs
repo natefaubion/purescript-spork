@@ -38,7 +38,7 @@ import Data.StrMap as SM
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.Machine as Machine
-import Spork.EventQueue (EventQueue, Loop(..), fromEventQueueSpec, looped, makeEventQueue)
+import Spork.EventQueue (EventQueue, Loop(..), fromEventQueueSpec, makeEventQueue)
 import Spork.EventQueue (Push) as Exports
 import Spork.Html (Html)
 import Spork.Html.Thunk (Thunk, buildThunk)
@@ -158,7 +158,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
           }
       vdom ← V.buildVDom vdomSpec (unwrap (app.render app.init.model))
       void $ DOM.appendChild (Machine.extract vdom) el
-      interpret ← looped <$> interpreter (push <<< Interpret)
+      interpret ← interpreter (push <<< Interpret)
       queueInterpret app.init.effects (app.subs app.init.model)
       pure
         { model: app.init.model
@@ -200,7 +200,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
           else pure state.vdom
       nextInterpret ←
         case state.interpret of
-          Loop _ f → looped <$> f
+          Loop _ f → f unit
       pure
         { model: state.model
         , vdom: nextVDom
