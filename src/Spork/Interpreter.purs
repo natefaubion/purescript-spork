@@ -16,62 +16,49 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error)
 import Data.Const (Const)
 import Data.Either (either)
-import Data.Functor.Coproduct (Coproduct, coproduct, left, right)
+import Data.Functor.Coproduct (Coproduct, coproduct)
 import Data.Newtype (unwrap)
-import Spork.EventQueue (EventQueue, Loop(..), stepper)
+import Spork.EventQueue (EventQueue, Loop(..), stepper, withCont)
 
-newtype Interpreter f m = Interpreter (EventQueue m (f (m Unit)))
+newtype Interpreter m f i = Interpreter (EventQueue m (f i) i)
 
 merge
-  ∷ ∀ f g m
+  ∷ ∀ f g m i
   . Applicative m
-  ⇒ Interpreter f m
-  → Interpreter g m
-  → Interpreter (Coproduct f g) m
-merge (Interpreter lhs) (Interpreter rhs) = Interpreter \push →
+  ⇒ Interpreter m f i
+  → Interpreter m g i
+  → Interpreter m (Coproduct f g) i
+merge (Interpreter lhs) (Interpreter rhs) = Interpreter \queue →
   let
-    tick
-      ∷ Loop m (f (m Unit))
-      → Loop m (g (m Unit))
-      → Loop m (Coproduct f g (m Unit))
+    tick ∷ Loop m (f i) → Loop m (g i) → Loop m (Coproduct f g i)
     tick l r = Loop (update l r) (commit l r)
 
-    update
-      ∷ Loop m (f (m Unit))
-      → Loop m (g (m Unit))
-      → Coproduct f g (m Unit)
-      → m (Loop m (Coproduct f g (m Unit)))
+    update ∷ Loop m (f i) → Loop m (g i) → Coproduct f g i → m (Loop m (Coproduct f g i))
     update l@(Loop loopL _) r@(Loop loopR _) =
       coproduct
         (map (flip tick r) <<< loopL)
         (map (tick l) <<< loopR)
 
-    commit
-      ∷ Loop m (f (m Unit))
-      → Loop m (g (m Unit))
-      → Unit
-      → m (Loop m (Coproduct f g (m Unit)))
+    commit ∷ Loop m (f i) → Loop m (g i) → Unit → m (Loop m (Coproduct f g i))
     commit (Loop _ commitL) (Loop _ commitR) _ =
       tick <$> commitL unit <*> commitR unit
   in
-    tick
-      <$> lhs (push <<< left)
-      <*> rhs (push <<< right)
+    tick <$> lhs queue <*> rhs queue
 
-never ∷ ∀ m. Applicative m ⇒ Interpreter (Const Void) m
+never ∷ ∀ m i. Monad m ⇒ Interpreter m (Const Void) i
 never = Interpreter (stepper (absurd <<< unwrap))
 
-liftCont ∷ ∀ f m. Applicative m ⇒ (f (m Unit) → m Unit) → Interpreter f m
-liftCont = Interpreter <<< stepper
+liftNat ∷  ∀ f m i. Monad m ⇒ (f ~> m) → Interpreter m f i
+liftNat k = Interpreter (stepper k)
 
-liftNat ∷  ∀ f m. Monad m ⇒ (f ~> m) → Interpreter f m
-liftNat k = Interpreter (stepper (join <<< k))
-
-basicEff ∷ ∀ eff. Interpreter (Eff eff) (Eff eff)
+basicEff ∷ ∀ eff i. Interpreter (Eff eff) (Eff eff) i
 basicEff = liftNat id
 
-basicAff ∷ ∀ eff. (Error → Eff eff Unit) → Interpreter (Aff eff) (Eff eff)
+liftCont ∷ ∀ f m i. Applicative m ⇒ (∀ j. (j → m Unit) → f j → m Unit) → Interpreter m f i
+liftCont k =  Interpreter (withCont \queue → k \j → queue.push j *> queue.run)
+
+basicAff ∷ ∀ eff i. (Error → Eff eff Unit) → Interpreter (Eff eff) (Aff eff) i
 basicAff = throughAff id
 
-throughAff ∷ ∀ f eff. (f ~> Aff eff) → (Error → Eff eff Unit) → Interpreter f (Eff eff)
-throughAff nat k = liftCont (void <<< runAff (either k id) <<< nat)
+throughAff ∷ ∀ eff f i. (f ~> Aff eff) → (Error → Eff eff Unit) → Interpreter (Eff eff) f i
+throughAff nat err = liftCont (\k → void <<< runAff (either err k) <<< nat)
