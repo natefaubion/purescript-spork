@@ -2,7 +2,9 @@
   "private": true,
   "scripts": {
     "build": "pulp build -- --strict --censor-lib",
-    "test": "pulp build -I test/src --to test/app.js -m Test.Main"
+    "example:all": "npm run example:todo-mvc && npm run example:subs",
+    "example:todo-mvc": "pulp build -I examples/todo-mvc/src --to examples/todo-mvc/app.js -m Todo.Main",
+    "example:subs": "pulp build -I examples/subs/src --to examples/subs/app.js -m Subs.Main"
   },
   "devDependencies": {
     "pulp": "^12.0.0",

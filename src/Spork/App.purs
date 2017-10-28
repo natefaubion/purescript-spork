@@ -3,16 +3,10 @@ module Spork.App
   , AppEffects
   , PureApp
   , BasicApp
-  , Transition
-  , Batch
-  , batch
-  , unBatch
-  , exec
-  , subscribe
-  , purely
   , make
   , makeWithSelector
-  , module Exports
+  , module Spork.Batch
+  , module Spork.Transition
   ) where
 
 import Prelude
@@ -29,48 +23,22 @@ import DOM.Node.ParentNode (QuerySelector(..), querySelector) as DOM
 import DOM.Node.Types (Node, elementToNode) as DOM
 import Data.Const (Const)
 import Data.Foldable (for_, traverse_)
-import Data.Functor.Compose (Compose(..))
 import Data.Functor.Coproduct (Coproduct, left, right)
 import Data.Maybe (Maybe(..))
-import Data.Monoid (class Monoid, mempty)
+import Data.Monoid (mempty)
 import Data.Newtype (unwrap)
 import Data.StrMap as SM
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.Machine as Machine
-import Spork.EventQueue (EventQueue, Loop(..), fromEventQueueSpec, looped, makeEventQueue)
-import Spork.EventQueue (Push) as Exports
+import Spork.Batch (Batch, batch, unBatch, lift)
+import Spork.EventQueue (EventQueue, Loop(..))
+import Spork.EventQueue as EventQueue
 import Spork.Html (Html)
 import Spork.Html.Thunk (Thunk, buildThunk)
 import Spork.Interpreter (Interpreter(..))
+import Spork.Transition (purely, Transition)
 import Unsafe.Reference (unsafeRefEq)
-
-newtype Batch f a = Batch (Compose Array f a)
-
-batch ∷ ∀ f a. Array (f a) → Batch f a
-batch as = Batch (Compose as)
-
-unBatch ∷ ∀ f a. Batch f a → Array (f a)
-unBatch (Batch (Compose as)) = as
-
-derive newtype instance functorBatch ∷ Functor f ⇒ Functor (Batch f)
-derive newtype instance applyBatch ∷ Apply f ⇒ Apply (Batch f)
-derive newtype instance applicativeBatch ∷ Applicative f ⇒ Applicative (Batch f)
-
-instance semigroupBatch ∷ Semigroup (Batch f a) where
-  append (Batch (Compose as)) (Batch (Compose bs)) = Batch (Compose (as <> bs))
-
-instance monoidBatch ∷ Monoid (Batch f a) where
-  mempty = Batch (Compose [])
-
-exec ∷ ∀ f a. f a → Batch f a
-exec = batch <<< pure
-
-subscribe ∷ ∀ f a. f a → Batch f a
-subscribe = batch <<< pure
-
-purely ∷ ∀ f s i. s → Transition f s i
-purely = { model: _, effects: mempty }
 
 type AppEffects eff =
   ( dom ∷ DOM
@@ -78,11 +46,6 @@ type AppEffects eff =
   , exception ∷ EXCEPTION
   | eff
   )
-
-type Transition m s i =
-  { model ∷ s
-  , effects ∷ Batch m i
-  }
 
 type App m q s i =
   { render ∷ s → Html i
@@ -109,67 +72,39 @@ type AppChange s i =
   , new ∷ s
   }
 
-data AppAction eff m q s i
+data AppAction m q s i
   = Restore s
   | Action i
-  | Interpret (Coproduct m q (Eff eff Unit))
+  | Interpret (Coproduct m q i)
 
 type AppState eff m q s i =
   { model ∷ s
   , needsRender ∷ Boolean
-  , interpret ∷ Loop (Eff eff) (Coproduct m q (Eff eff Unit))
+  , interpret ∷ Loop (Eff eff) (Coproduct m q i)
   , vdom ∷ Machine.Step (Eff eff) (V.VDom (Array (P.Prop i)) (Thunk Html i)) DOM.Node
   }
 
 makeAppQueue
   ∷ ∀ eff m q s i
-  . Functor m
-  ⇒ Functor q
-  ⇒ (AppChange s i → Eff (AppEffects eff) Unit)
-  → Interpreter (Coproduct m q) (Eff (AppEffects eff))
+  . (AppChange s i → Eff (AppEffects eff) Unit)
+  → Interpreter (Eff (AppEffects eff)) (Coproduct m q) i
   → App m q s i
   → DOM.Node
-  → EventQueue (Eff (AppEffects eff)) (AppAction (AppEffects eff) m q s i)
-makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \push →
+  → EventQueue (Eff (AppEffects eff)) (AppAction m q s i) (AppAction m q s i)
+makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \self → do
   let
-    pushAction = push <<< Action
-    pushEffect = push <<< Interpret <<< left
-    pushSub = push <<< Interpret <<< right
+    pushAction = self.push <<< Action
+    pushEffect = self.push <<< Interpret <<< left
+    pushSub = self.push <<< Interpret <<< right
 
-    queueInterpret
-      ∷ Batch m i
-      → Batch q i
-      → Eff (AppEffects eff) Unit
+    queueInterpret ∷ Batch m i → Batch q i → Eff (AppEffects eff) Unit
     queueInterpret effs subs = do
-      traverse_ (pushEffect <<< map pushAction) $ unBatch effs
-      traverse_ (pushSub <<< map pushAction) $ unBatch subs
-
-    init ∷ Eff (AppEffects eff) (AppState (AppEffects eff) m q s i)
-    init = do
-      document ←
-        DOM.window
-          >>= DOM.document
-          >>> map DOM.htmlDocumentToDocument
-      let
-        vdomSpec = V.VDomSpec
-          { document
-          , buildWidget: buildThunk unwrap
-          , buildAttributes: P.buildProp pushAction
-          }
-      vdom ← V.buildVDom vdomSpec (unwrap (app.render app.init.model))
-      void $ DOM.appendChild (Machine.extract vdom) el
-      interpret ← looped <$> interpreter (push <<< Interpret)
-      queueInterpret app.init.effects (app.subs app.init.model)
-      pure
-        { model: app.init.model
-        , needsRender: false
-        , interpret
-        , vdom
-        }
+      traverse_ pushEffect (unBatch effs)
+      traverse_ pushSub (unBatch subs)
 
     update
       ∷ AppState (AppEffects eff) m q s i
-      → AppAction (AppEffects eff) m q s i
+      → AppAction m q s i
       → Eff (AppEffects eff) (AppState (AppEffects eff) m q s i)
     update state@{ interpret: Loop k _ } = case _ of
       Interpret m → do
@@ -188,6 +123,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
         let
           needsRender = state.needsRender || not (unsafeRefEq state.model nextModel)
           nextState = state { model = nextModel, needsRender = needsRender }
+        queueInterpret mempty (app.subs nextModel)
         pure nextState
 
     commit
@@ -200,21 +136,40 @@ makeAppQueue onChange (Interpreter interpreter) app el = fromEventQueueSpec \pus
           else pure state.vdom
       nextInterpret ←
         case state.interpret of
-          Loop _ f → looped <$> f
+          Loop _ f → f unit
       pure
         { model: state.model
         , vdom: nextVDom
         , interpret: nextInterpret
         , needsRender: false
         }
-  in
-    { init, update, commit }
+
+  document ←
+    DOM.window
+      >>= DOM.document
+      >>> map DOM.htmlDocumentToDocument
+  let
+    vdomSpec = V.VDomSpec
+      { document
+      , buildWidget: buildThunk unwrap
+      , buildAttributes: P.buildProp (\a → pushAction a *> self.run)
+      }
+  vdom ← V.buildVDom vdomSpec (unwrap (app.render app.init.model))
+  void $ DOM.appendChild (Machine.extract vdom) el
+  interpret ← interpreter (self { push = self.push <<< Action })
+  queueInterpret app.init.effects (app.subs app.init.model)
+  let
+    init =
+      { model: app.init.model
+      , needsRender: false
+      , interpret
+      , vdom
+      }
+  pure { init, update, commit }
 
 make
   ∷ ∀ eff m q s i
-  . Functor m
-  ⇒ Functor q
-  ⇒ Interpreter (Coproduct m q) (Eff (AppEffects eff))
+  . Interpreter (Eff (AppEffects eff)) (Coproduct m q) i
   → App m q s i
   → DOM.Node
   → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)
@@ -222,9 +177,7 @@ make interpreter app el = do
   subsRef ← newRef { fresh: 0, cbs: SM.empty }
   stateRef ← newRef app.init.model
   let
-    handleChange
-      ∷ AppChange s i
-      → Eff (AppEffects eff) Unit
+    handleChange ∷ AppChange s i → Eff (AppEffects eff) Unit
     handleChange appChange = do
       writeRef stateRef appChange.new
       subs ← readRef subsRef
@@ -242,16 +195,14 @@ make interpreter app el = do
         }
       pure (remove key)
 
-    remove
-      ∷ String
-      → Eff (AppEffects eff) Unit
+    remove ∷ String → Eff (AppEffects eff) Unit
     remove key =
       modifyRef subsRef \subs → subs
         { cbs = SM.delete key subs.cbs
         }
 
   { push, run } ←
-    makeEventQueue $ makeAppQueue handleChange interpreter app el
+    EventQueue.fix $ makeAppQueue handleChange interpreter app el
 
   pure
     { push: push <<< Action
@@ -263,9 +214,7 @@ make interpreter app el = do
 
 makeWithSelector
   ∷ ∀ eff m q s i
-  . Functor m
-  ⇒ Functor q
-  ⇒ Interpreter (Coproduct m q) (Eff (AppEffects eff))
+  . Interpreter (Eff (AppEffects eff)) (Coproduct m q) i
   → App m q s i
   → String
   → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)

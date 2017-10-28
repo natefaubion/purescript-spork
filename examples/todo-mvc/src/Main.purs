@@ -1,4 +1,4 @@
-module Test.Main where
+module Todo.Main where
 
 import Prelude
 
@@ -84,7 +84,7 @@ modifyWhere pred mod = map (\a → if pred a then mod a else a)
 toStorage ∷ Model → App.Transition Effect Model Action
 toStorage model =
   { model
-  , effects: App.exec (WriteStorage model None)
+  , effects: App.lift (WriteStorage model None)
   }
 
 update ∷ Model → Action → App.Transition Effect Model Action
@@ -165,7 +165,7 @@ update model = case _ of
   TodoElement ref →
     let
       effects = case ref of
-        H.Created el → App.exec (Focus el None)
+        H.Created el → App.lift (Focus el None)
         H.Removed _  → mempty
     in
       { model, effects }
@@ -271,7 +271,7 @@ renderTodo todo =
                 [ H.text todo.text ]
             , H.button
                 [ H.classes [ "destroy" ]
-                , H.onClick \_ → Just (DeleteTodo todo.id)
+                , H.onClick (H.always_ (DeleteTodo todo.id))
                 , H.type_ H.ButtonButton
                 ]
                 []
@@ -438,8 +438,9 @@ main = do
       (liftNat runEffect `merge` never)
       (app storedModel)
       "#app"
+  inst.run
 
   hashes \oldHash newHash →
-    F.for_ (routeAction newHash) inst.push
-
-  inst.run
+    F.for_ (routeAction newHash) \i → do
+      inst.push i
+      inst.run
