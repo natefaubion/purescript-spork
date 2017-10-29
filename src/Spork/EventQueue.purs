@@ -49,7 +49,7 @@ stepper k next = tick unit
     next.run
     pure (Loop loop tick)
 
-withCont ∷ ∀ m i o a. Applicative m ⇒ (EventQueueInstance m o → i → m Unit) → EventQueue m i o
+withCont ∷ ∀ m i o. Applicative m ⇒ (EventQueueInstance m o → i → m Unit) → EventQueue m i o
 withCont k next = tick unit
   where
   push ∷ i → m Unit
@@ -80,7 +80,7 @@ withAccum specFn next = specFn next <#> \spec →
     tick spec.init
 
 withAccumArray
-  ∷ ∀ m s i o
+  ∷ ∀ m i o
   . Applicative m
   ⇒ (EventQueueInstance m o → m (Array i → m Unit))
   → EventQueue m i o
