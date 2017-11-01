@@ -1,6 +1,14 @@
 {
   "name": "purescript-spork",
+  "homepage": "https://github.com/natefaubion/purescript-spork",
+  "authors": [
+    "Nathan Faubion <nathan@n-son.com>"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/natefaubion/purescript-spork.git"
+  },
   "ignore": [
     "**/.*",
     "node_modules",
