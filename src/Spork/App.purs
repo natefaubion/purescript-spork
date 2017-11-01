@@ -49,7 +49,7 @@ type AppEffects eff =
   | eff
   )
 
--- | A specification for Spork app:
+-- | A specification for a Spork app:
 -- |    * `render` - Renders a model to `Html` which yields actions via DOM events.
 -- |    * `update` - Takes the current model and, with a new action, transitions to a new model while optionally running effects.
 -- |    * `subs` - Determines the set of active subscriptions based on the model.
