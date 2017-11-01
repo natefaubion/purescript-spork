@@ -5,5 +5,5 @@
 /.psc*
 /.psa*
 /.vscode
-/.package-lock.json
+/package-lock.json
 /examples/*/app.js
