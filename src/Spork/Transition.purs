@@ -11,5 +11,6 @@ type Transition m s i =
   , effects ∷ Batch m i
   }
 
+-- | A pure model Transition without effects.
 purely ∷ ∀ f s i. s → Transition f s i
 purely = { model: _, effects: mempty }
