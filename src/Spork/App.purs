@@ -1,6 +1,8 @@
 module Spork.App
   ( App
   , AppEffects
+  , AppInstance
+  , AppChange
   , PureApp
   , BasicApp
   , make
@@ -47,29 +49,42 @@ type AppEffects eff =
   | eff
   )
 
-type App m q s i =
-  { render ∷ s → Html i
-  , update ∷ s → i → Transition m s i
-  , subs ∷ s → Batch q i
-  , init ∷ Transition m s i
+-- | A specification for a Spork app:
+-- |    * `render` - Renders a model to `Html` which yields actions via DOM events.
+-- |    * `update` - Takes the current model and, with a new action, transitions to a new model while optionally running effects.
+-- |    * `subs` - Determines the set of active subscriptions based on the model.
+-- |    * `init` - Initial model and effects to kickstart the application.
+type App effects subs model action =
+  { render ∷ model → Html action
+  , update ∷ model → action → Transition effects model action
+  , subs ∷ model → Batch subs action
+  , init ∷ Transition effects model action
   }
 
-type PureApp s i = App (Const Void) (Const Void) s i
+-- | A type synonym for Apps which have neither effects nor subs.
+type PureApp model action = App (Const Void) (Const Void) model action
 
-type BasicApp m s i = App m (Const Void) s i
+-- | A type synonym for Apps which don't have subs.
+type BasicApp effects model action = App effects (Const Void) model action
 
-type AppInstance eff s i =
-  { push ∷ i → Eff eff Unit
-  , snapshot ∷ Eff eff s
-  , restore ∷ s → Eff eff Unit
-  , subscribe ∷ (AppChange s i → Eff eff Unit) → Eff eff (Eff eff Unit)
+-- | The interface for communicating with a running App.
+-- |    * `push` - Buffers an action to be run on the next tick.
+-- |    * `run` - Initiates a tick of the App, flushing and applying all queued actions.
+-- |    * `snapshot` - Yields the current model of the App.
+-- |    * `restore` - Replaces the current model of the App.
+-- |    * `subscribe` - Listens to App changes (model and actions).
+type AppInstance eff model action =
+  { push ∷ action → Eff eff Unit
   , run ∷ Eff eff Unit
+  , snapshot ∷ Eff eff model
+  , restore ∷ model → Eff eff Unit
+  , subscribe ∷ (AppChange model action → Eff eff Unit) → Eff eff (Eff eff Unit)
   }
 
-type AppChange s i =
-  { old ∷ s
-  , action ∷ i
-  , new ∷ s
+type AppChange model action =
+  { old ∷ model
+  , action ∷ action
+  , new ∷ model
   }
 
 data AppAction m q s i
@@ -167,24 +182,36 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
       }
   pure { init, update, commit }
 
+-- | Builds a running App given an `Interpreter` and a parent DOM Node.
+-- |
+-- | ```purescript
+-- | example domNode = do
+-- |   inst <- App.make (basicAff `merge` never) app domNode
+-- |   _    <- inst.subscribe \_ -> log "Got a change!"
+-- |   inst.run
+-- | ```
+-- |
+-- | The returned `AppInstance` has yet to run any initial effects. You may
+-- | use the opportunity to setup change handlers. Invoke `inst.run` when
+-- | ready to run initial effects.
 make
-  ∷ ∀ eff m q s i
-  . Interpreter (Eff (AppEffects eff)) (Coproduct m q) i
-  → App m q s i
+  ∷ ∀ eff effects subs model action
+  . Interpreter (Eff (AppEffects eff)) (Coproduct effects subs) action
+  → App effects subs model action
   → DOM.Node
-  → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)
+  → Eff (AppEffects eff) (AppInstance (AppEffects eff) model action)
 make interpreter app el = do
   subsRef ← newRef { fresh: 0, cbs: SM.empty }
   stateRef ← newRef app.init.model
   let
-    handleChange ∷ AppChange s i → Eff (AppEffects eff) Unit
+    handleChange ∷ AppChange model action → Eff (AppEffects eff) Unit
     handleChange appChange = do
       writeRef stateRef appChange.new
       subs ← readRef subsRef
       for_ subs.cbs (_ $ appChange)
 
     subscribe'
-      ∷ (AppChange s i → Eff (AppEffects eff) Unit)
+      ∷ (AppChange model action → Eff (AppEffects eff) Unit)
       → (Eff (AppEffects eff) (Eff (AppEffects eff) Unit))
     subscribe' cb = do
       subs ← readRef subsRef
@@ -212,12 +239,24 @@ make interpreter app el = do
     , run
     }
 
+-- | Builds a running App given an `Interpreter` and a DOM selector.
+-- |
+-- | ```purescript
+-- | main = do
+-- |   inst <- App.makeWithSelector (basicAff `merge` never) app "#app"
+-- |   _    <- inst.subscribe \_ -> log "Got a change!"
+-- |   inst.run
+-- | ```
+-- |
+-- | The returned `AppInstance` has yet to run any initial effects. You may
+-- | use the opportunity to setup change handlers. Invoke `inst.run` when
+-- | ready to run initial effects.
 makeWithSelector
-  ∷ ∀ eff m q s i
-  . Interpreter (Eff (AppEffects eff)) (Coproduct m q) i
-  → App m q s i
+  ∷ ∀ eff effects subs model action
+  . Interpreter (Eff (AppEffects eff)) (Coproduct effects subs) action
+  → App effects subs model action
   → String
-  → Eff (AppEffects eff) (AppInstance (AppEffects eff) s i)
+  → Eff (AppEffects eff) (AppInstance (AppEffects eff) model action)
 makeWithSelector interpret app sel = do
   mbEl ←
     DOM.window

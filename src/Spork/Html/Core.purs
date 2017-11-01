@@ -157,15 +157,23 @@ on ty = IProp <<< P.Handler (DOM.EventType ty)
 ref ∷ ∀ r i. (P.ElemRef DOM.Element → Maybe i) → IProp r i
 ref = IProp <<< P.Ref
 
+-- | Lazily renders a subtree given the same render function and argument.
 lazy ∷ ∀ a i. (a → Html i) → a → Html i
 lazy f a = Html (V.Widget (Fn.runFn2 thunk1 f a))
 
+-- | Like `lazy`, but allows two arguments.
 lazy2 ∷ ∀ a b i. (a → b → Html i) → a → b → Html i
 lazy2 f a b = Html (V.Widget (Fn.runFn3 thunk2 f a b))
 
+-- | Like `lazy`, but allows three arguments.
 lazy3 ∷ ∀ a b c i. (a → b → c → Html i) → a → b → c → Html i
 lazy3 f a b c = Html (V.Widget (Fn.runFn4 thunk3 f a b c))
 
+-- | Creates a render function which will lazily render it's subtree
+-- | according to the given equality predicate. Arguments determined to be
+-- | equal will not be re-rendered. The usage of this function is slightly
+-- | Different than `lazy` in that you must apply it at the top-level of
+-- | module.
 memoized ∷ ∀ a i. (a → a → Boolean) → (a → Html i) → a → Html i
 memoized eqFn f = Html <<< V.Widget <$> thunked eqFn f
 

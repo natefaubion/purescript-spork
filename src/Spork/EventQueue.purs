@@ -37,6 +37,7 @@ type EventQueueInstance m o =
   , push ∷ o → m Unit
   }
 
+-- | Creates an EventQueue from a Kleisli arrow.
 stepper ∷ ∀ m i o. Monad m ⇒ (i → m o) → EventQueue m i o
 stepper k next = tick unit
   where
@@ -49,6 +50,7 @@ stepper k next = tick unit
     next.run
     pure (Loop loop tick)
 
+-- | Creates an EventQueue which performs an action on every input.
 withCont ∷ ∀ m i o. Applicative m ⇒ (EventQueueInstance m o → i → m Unit) → EventQueue m i o
 withCont k next = tick unit
   where
@@ -61,6 +63,7 @@ withCont k next = tick unit
   loop ∷ i → m (Loop m i)
   loop i = push i $> Loop loop tick
 
+-- | Creates an EventQueue with an EventQueueAccum lifecycle.
 withAccum
   ∷ ∀ m s i o
   . Applicative m
@@ -79,6 +82,8 @@ withAccum specFn next = specFn next <#> \spec →
   in
     tick spec.init
 
+-- | Creates an EventQueue comprised of only a commit action for inputs
+-- | buffered in an Array.
 withAccumArray
   ∷ ∀ m i o
   . Applicative m
@@ -94,6 +99,7 @@ withAccumArray specFn = withAccum \next → specFn next <#> \spec →
   in
     { init: [], commit, update }
 
+-- | Creates an EventQueue that can feed back into itself.
 fix
   ∷ ∀ eff i
   . EventQueue (Eff (QueueEffects eff)) i i

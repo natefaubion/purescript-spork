@@ -10,14 +10,17 @@ import Prelude
 import Data.Functor.Compose (Compose(..))
 import Data.Monoid (class Monoid)
 
+-- | A type for Batching effects/subscriptions.
 newtype Batch f a = Batch (Compose Array f a)
 
+-- | Builds a `Batch` from an Array.
 batch ∷ ∀ f a. Array (f a) → Batch f a
 batch as = Batch (Compose as)
 
 unBatch ∷ ∀ f a. Batch f a → Array (f a)
 unBatch (Batch (Compose as)) = as
 
+-- | Lifts a singleton effect/subscription into `Batch`.
 lift ∷ ∀ f a. f a → Batch f a
 lift = batch <<< pure
 
