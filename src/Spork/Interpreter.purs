@@ -64,7 +64,7 @@ basicEff = liftNat id
 liftCont ∷ ∀ f m i. Applicative m ⇒ (∀ j. (j → m Unit) → f j → m Unit) → Interpreter m f i
 liftCont k =  Interpreter (withCont \queue → k \j → queue.push j *> queue.run)
 
--- | Runs `Aff` effects. Takes a callback for handling exceptions.`
+-- | Runs `Aff` effects. Takes a callback for handling exceptions.
 basicAff ∷ ∀ eff i. (Error → Eff eff Unit) → Interpreter (Eff eff) (Aff eff) i
 basicAff = throughAff id
 
