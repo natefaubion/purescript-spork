@@ -13,7 +13,7 @@ module Spork.App
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Exception (EXCEPTION, throwException, error)
 import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef, modifyRef)
 import DOM (DOM)
@@ -24,10 +24,9 @@ import DOM.Node.Node (appendChild) as DOM
 import DOM.Node.ParentNode (QuerySelector(..), querySelector) as DOM
 import DOM.Node.Types (Node, elementToNode) as DOM
 import Data.Const (Const)
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_)
 import Data.Functor.Coproduct (Coproduct, left, right)
 import Data.Maybe (Maybe(..))
-import Data.Monoid (mempty)
 import Data.Newtype (unwrap)
 import Data.StrMap as SM
 import Halogen.VDom as V
@@ -110,12 +109,18 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
   let
     pushAction = self.push <<< Action
     pushEffect = self.push <<< Interpret <<< left
-    pushSub = self.push <<< Interpret <<< right
 
-    queueInterpret ∷ Batch m i → Batch q i → Eff (AppEffects eff) Unit
-    queueInterpret effs subs = do
-      traverse_ pushEffect (unBatch effs)
-      traverse_ pushSub (unBatch subs)
+    runSubs
+      ∷ Loop (Eff (AppEffects eff)) (Coproduct m q i)
+      → Array (q i)
+      → Eff (AppEffects eff) (Loop (Eff (AppEffects eff)) (Coproduct m q i))
+    runSubs interpret subs = do
+      ref ← newRef interpret
+      foreachE subs \sub -> do
+        Loop k _ ← readRef ref
+        next ← k (right sub)
+        writeRef ref next
+      readRef ref
 
     update
       ∷ AppState (AppEffects eff) m q s i
@@ -132,13 +137,12 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
           nextState = state { model = next.model, needsRender = needsRender }
           appChange = { old: state.model, action: i, new: next.model }
         onChange appChange
-        queueInterpret next.effects (app.subs next.model)
+        foreachE (unBatch next.effects) pushEffect
         pure nextState
       Restore nextModel → do
         let
           needsRender = state.needsRender || not (unsafeRefEq state.model nextModel)
           nextState = state { model = nextModel, needsRender = needsRender }
-        queueInterpret mempty (app.subs nextModel)
         pure nextState
 
     commit
@@ -149,8 +153,12 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
         if state.needsRender
           then Machine.step state.vdom (unwrap (app.render state.model))
           else pure state.vdom
+      tickInterpret ←
+        if state.needsRender
+          then runSubs state.interpret (unBatch (app.subs state.model))
+          else pure state.interpret
       nextInterpret ←
-        case state.interpret of
+        case tickInterpret of
           Loop _ f → f unit
       pure
         { model: state.model
@@ -172,7 +180,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
   vdom ← V.buildVDom vdomSpec (unwrap (app.render app.init.model))
   void $ DOM.appendChild (Machine.extract vdom) el
   interpret ← interpreter (self { push = self.push <<< Action })
-  queueInterpret app.init.effects (app.subs app.init.model)
+  foreachE (unBatch app.init.effects) pushEffect
   let
     init =
       { model: app.init.model
