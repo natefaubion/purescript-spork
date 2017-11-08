@@ -153,13 +153,8 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
         if state.needsRender
           then Machine.step state.vdom (unwrap (app.render state.model))
           else pure state.vdom
-      tickInterpret ←
-        if state.needsRender
-          then runSubs state.interpret (unBatch (app.subs state.model))
-          else pure state.interpret
-      nextInterpret ←
-        case tickInterpret of
-          Loop _ f → f unit
+      tickInterpret ← runSubs state.interpret (unBatch (app.subs state.model))
+      nextInterpret ← case tickInterpret of Loop _ f → f unit
       pure
         { model: state.model
         , vdom: nextVDom
