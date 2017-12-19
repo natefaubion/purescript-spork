@@ -3,8 +3,9 @@ module Spork.Html
   ) where
 
 import Spork.Html.Core
-  ( Html, IProp(..), ElementRef, ElemRef(..), text, elem, keyed, prop, attr, on, ref
-  , lazy, lazy2, lazy3, memoized, empty, when
+  ( Html, IProp(..), ElementRef, ElemRef(..), Namespace(..), text, elem
+  , elemWithNS, keyed, keyedWithNS, prop, attr, on, ref, lazy, lazy2, lazy3
+  , memoized, empty, when
   ) as Exports
 
 import Spork.Html.Elements

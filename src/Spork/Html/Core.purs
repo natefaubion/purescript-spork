@@ -4,7 +4,9 @@ module Spork.Html.Core
   , IProp (..)
   , text
   , elem
+  , elemWithNS
   , keyed
+  , keyedWithNS
   , class ToPropValue
   , toPropValue
   , prop
@@ -46,6 +48,7 @@ import DOM.Node.Types (Element) as DOM
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.DOM.Prop (ElemRef(..)) as Exports
+import Halogen.VDom.Types (Namespace(..)) as Exports
 import Spork.Html.Thunk (Thunk, thunked, thunk1, thunk2, thunk3)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -132,17 +135,23 @@ text ∷ ∀ i. String → Html i
 text = Html <<< V.Text
 
 elem ∷ ∀ r i. String → Array (IProp r i) → Array (Html i) → Html i
-elem name props children =
+elem = elemWithNS Nothing
+
+elemWithNS ∷ ∀ r i. Maybe Exports.Namespace → String → Array (IProp r i) → Array (Html i) → Html i
+elemWithNS ns name props children =
   Html
     (V.Elem
-      (V.ElemSpec Nothing (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
+      (V.ElemSpec ns (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
       (unwrapF children))
 
 keyed ∷ ∀ r i. String → Array (IProp r i) → Array (Tuple String (Html i)) → Html i
-keyed name props children =
+keyed = keyedWithNS Nothing
+
+keyedWithNS ∷ ∀ r i. Maybe Exports.Namespace → String → Array (IProp r i) → Array (Tuple String (Html i)) → Html i
+keyedWithNS ns name props children =
   Html
     (V.Keyed
-      (V.ElemSpec Nothing (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
+      (V.ElemSpec ns (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
       (unwrapG children))
 
 prop ∷ ∀ r i a. ToPropValue a ⇒ String → a → IProp r i
