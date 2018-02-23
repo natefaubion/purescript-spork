@@ -131,6 +131,8 @@ instance wrapValueToPropValue :: ToPropValue WrapValue where
 
 newtype IProp (r ∷ # Type) i = IProp (P.Prop i)
 
+derive instance functorIProp ∷ Functor (IProp r)
+
 text ∷ ∀ i. String → Html i
 text = Html <<< V.Text
 

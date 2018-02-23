@@ -20,7 +20,7 @@ import Data.Foldable as F
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Tuple (Tuple(..))
-import Routing (hashes)
+import Routing (hashChanged)
 import Simple.JSON (readJSON, writeJSON)
 import Spork.App as App
 import Spork.Html as H
@@ -440,7 +440,7 @@ main = do
       "#app"
   inst.run
 
-  hashes \oldHash newHash →
+  hashChanged \oldHash newHash →
     F.for_ (routeAction newHash) \i → do
       inst.push i
       inst.run

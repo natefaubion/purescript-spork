@@ -38,6 +38,7 @@ import Spork.EventQueue as EventQueue
 import Spork.Html (Html)
 import Spork.Html.Thunk (Thunk, buildThunk)
 import Spork.Interpreter (Interpreter(..))
+import Spork.Scheduler (makeImmediate)
 import Spork.Transition (purely, Transition)
 import Unsafe.Reference (unsafeRefEq)
 
@@ -90,10 +91,18 @@ data AppAction m q s i
   = Restore s
   | Action i
   | Interpret (Coproduct m q i)
+  | Render
+
+data RenderStatus
+  = NoChange
+  | Pending
+  | Flushed
+
+derive instance eqRenderStatus ∷ Eq RenderStatus
 
 type AppState eff m q s i =
   { model ∷ s
-  , needsRender ∷ Boolean
+  , status ∷ RenderStatus
   , interpret ∷ Loop (Eff eff) (Coproduct m q i)
   , vdom ∷ Machine.Step (Eff eff) (V.VDom (Array (P.Prop i)) (Thunk Html i)) DOM.Node
   }
@@ -106,9 +115,18 @@ makeAppQueue
   → DOM.Node
   → EventQueue (Eff (AppEffects eff)) (AppAction m q s i) (AppAction m q s i)
 makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \self → do
+  schedule ← makeImmediate (self.push Render *> self.run)
   let
     pushAction = self.push <<< Action
     pushEffect = self.push <<< Interpret <<< left
+
+    nextStatus ∷ s → s → RenderStatus → RenderStatus
+    nextStatus prevModel nextModel = case _ of
+      NoChange
+        | unsafeRefEq prevModel nextModel → NoChange
+        | otherwise → Pending
+      Flushed → NoChange
+      Pending → Pending
 
     runSubs
       ∷ Loop (Eff (AppEffects eff)) (Coproduct m q i)
@@ -133,34 +151,32 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
       Action i → do
         let
           next = app.update state.model i
-          needsRender = state.needsRender || not (unsafeRefEq state.model next.model)
-          nextState = state { model = next.model, needsRender = needsRender }
+          status = nextStatus state.model next.model state.status
+          nextState = state { model = next.model, status = status }
           appChange = { old: state.model, action: i, new: next.model }
         onChange appChange
         foreachE (unBatch next.effects) pushEffect
         pure nextState
       Restore nextModel → do
         let
-          needsRender = state.needsRender || not (unsafeRefEq state.model nextModel)
-          nextState = state { model = nextModel, needsRender = needsRender }
+          status = nextStatus state.model nextModel state.status
+          nextState = state { model = nextModel, status = status }
         pure nextState
+      Render → do
+        vdom ← Machine.step state.vdom (unwrap (app.render state.model))
+        pure $ state { vdom = vdom, status = Flushed }
 
     commit
       ∷ AppState (AppEffects eff) m q s i
       → Eff (AppEffects eff) (AppState (AppEffects eff) m q s i)
-    commit state = do
-      nextVDom ←
-        if state.needsRender
-          then Machine.step state.vdom (unwrap (app.render state.model))
-          else pure state.vdom
-      tickInterpret ← runSubs state.interpret (unBatch (app.subs state.model))
-      nextInterpret ← case tickInterpret of Loop _ f → f unit
-      pure
-        { model: state.model
-        , vdom: nextVDom
-        , interpret: nextInterpret
-        , needsRender: false
-        }
+    commit state = case state.status of
+      Flushed →
+        pure $ state { status = NoChange }
+      status → do
+        when (status == Pending) schedule
+        tickInterpret ← runSubs state.interpret (unBatch (app.subs state.model))
+        nextInterpret ← case tickInterpret of Loop _ f → f unit
+        pure $ state { interpret = nextInterpret, status = NoChange }
 
   document ←
     DOM.window
@@ -179,7 +195,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
   let
     init =
       { model: app.init.model
-      , needsRender: false
+      , status: NoChange
       , interpret
       , vdom
       }
