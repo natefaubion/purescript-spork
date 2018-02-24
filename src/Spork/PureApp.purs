@@ -10,7 +10,6 @@ import Prelude
 
 import Control.Monad.Eff (Eff)
 import DOM.Node.Types as DOM
-import Data.Const (Const)
 import Data.Monoid (mempty)
 import Spork.App (App, AppEffects, AppInstance, AppChange)
 import Spork.App as App
@@ -54,9 +53,9 @@ makeWithSelector = App.makeWithSelector (never `merge` never) <<< toApp
 
 -- | Converts a `PureApp` to a regular `App`.
 toApp
-  ∷ ∀ model action
+  ∷ ∀ model action void1 void2
   . PureApp model action
-  → App (Const Void) (Const Void) model action
+  → App void1 void2 model action
 toApp app =
   { render: app.render
   , update: \model action → App.purely (app.update model action)
