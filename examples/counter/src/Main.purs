@@ -17,7 +17,7 @@ update i = case _ of
   Inc → i + 1
   Dec → i - 1
 
-render ∷ Model -> Html Action
+render ∷ Model → Html Action
 render i =
   H.div []
     [ H.button
