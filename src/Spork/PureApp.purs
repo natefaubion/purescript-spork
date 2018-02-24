@@ -17,6 +17,7 @@ import Spork.App as App
 import Spork.Html (Html)
 import Spork.Interpreter (merge, never)
 
+-- | A `PureApp` has no effects or subscriptions.
 type PureApp model action =
   { render ∷ model → Html action
   , update ∷ model → action → model
