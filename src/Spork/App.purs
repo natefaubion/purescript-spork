@@ -3,7 +3,6 @@ module Spork.App
   , AppEffects
   , AppInstance
   , AppChange
-  , PureApp
   , BasicApp
   , make
   , makeWithSelector
@@ -60,9 +59,6 @@ type App effects subs model action =
   , subs ∷ model → Batch subs action
   , init ∷ Transition effects model action
   }
-
--- | A type synonym for Apps which have neither effects nor subs.
-type PureApp model action = App (Const Void) (Const Void) model action
 
 -- | A type synonym for Apps which don't have subs.
 type BasicApp effects model action = App effects (Const Void) model action
