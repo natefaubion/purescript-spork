@@ -5,6 +5,24 @@
 
 An Elm-like for PureScript. No `npm` dependencies required.
 
+## Try before you buy
+
+Clone the repository. Then:
+
+```
+npm install
+bower install
+npm run example:all
+```
+
+Open the `index.html` file in each example directory. On MacOS and
+possibly other systems, this will work:
+
+```
+cd examples/counter
+open index.html
+```
+
 ## Install
 
 ```
