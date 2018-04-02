@@ -49,11 +49,14 @@ render { subscribing, coord } =
         [ H.text
             if subscribing
               then "Unsubscribe"
-              else "Subscribe"
+              else "Track the Pointer"
         ]
     , H.span
         [ H.classes [ guard subscribing "subscribing" ] ]
-        [ H.text (maybe "No coord" renderCoord coord)
+        [ H.text
+            if subscribing
+               then (maybe "Move the pointer" renderCoord coord)
+               else ""
         ]
     ]
 

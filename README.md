@@ -23,6 +23,9 @@ cd examples/counter
 open index.html
 ```
 
+See each example's `README.md` for a description of the example, or
+for advice if you have problems.
+
 ## Install
 
 ```
@@ -32,5 +35,3 @@ bower install purescript-spork
 ## Documentation
 
 - Module documentation is [published on Pursuit](http://pursuit.purescript.org/packages/purescript-spork).
-
-
