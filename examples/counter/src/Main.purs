@@ -2,7 +2,7 @@ module Counter.Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
+import Effect (Effect)
 import Spork.Html (Html)
 import Spork.Html as H
 import Spork.PureApp (PureApp)
@@ -34,5 +34,5 @@ render i =
 app ∷ PureApp Model Action
 app = { update, render, init: 0 }
 
-main ∷ Eff (PureApp.AppEffects ()) Unit
+main ∷ Effect Unit
 main = void $ PureApp.makeWithSelector app "#app"

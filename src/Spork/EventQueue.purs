@@ -3,7 +3,6 @@ module Spork.EventQueue
   , EventQueue
   , EventQueueAccum
   , EventQueueInstance
-  , QueueEffects
   , stepper
   , withCont
   , withAccum
@@ -13,18 +12,16 @@ module Spork.EventQueue
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef, modifyRef)
 import Control.Monad.Rec.Class as MR
 import Data.Array as Array
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..))
+import Effect (Effect)
+import Effect.Ref as Ref
 
 data Loop m i = Loop (i → m (Loop m i)) (Unit → m (Loop m i))
 
 type EventQueue m i o = EventQueueInstance m o → m (Loop m i)
-
-type QueueEffects eff = (ref ∷ REF | eff)
 
 type EventQueueAccum m s i =
   { init ∷ s
@@ -101,41 +98,41 @@ withAccumArray specFn = withAccum \next → specFn next <#> \spec →
 
 -- | Creates an EventQueue that can feed back into itself.
 fix
-  ∷ ∀ eff i
-  . EventQueue (Eff (QueueEffects eff)) i i
-  → Eff (QueueEffects eff) (EventQueueInstance (Eff (QueueEffects eff)) i)
+  ∷ ∀ i
+  . EventQueue Effect i i
+  → Effect (EventQueueInstance Effect i)
 fix proc = do
-  queue   ← newRef []
-  machine ← newRef Nothing
+  queue   ← Ref.new []
+  machine ← Ref.new Nothing
 
   let
-    push ∷ i → Eff (QueueEffects eff) Unit
-    push = modifyRef queue <<< flip Array.snoc
+    push ∷ i → Effect Unit
+    push = flip Ref.modify queue <<< flip Array.snoc
 
-    run ∷ Eff (QueueEffects eff) Unit
-    run = traverse_ loop =<< (readRef machine <* writeRef machine Nothing)
+    run ∷ Effect Unit
+    run = traverse_ loop =<< (Ref.read machine <* Ref.write Nothing machine)
 
-    loop ∷ Loop (Eff (QueueEffects eff)) i → Eff (QueueEffects eff) Unit
+    loop ∷ Loop Effect i → Effect Unit
     loop = MR.tailRecM \(Loop next done) → do
-      q ← readRef queue
+      q ← Ref.read queue
       case Array.uncons q of
         Just { head, tail } → do
-          writeRef queue tail
+          Ref.write tail queue
           MR.Loop <$> next head
         Nothing → do
           step ← done unit
-          isEmpty ← Array.null <$> readRef queue
+          isEmpty ← Array.null <$> Ref.read queue
           if isEmpty
             then do
-              writeRef machine (Just step)
-              writeRef queue []
+              Ref.write (Just step) machine
+              Ref.write [] queue
               pure (MR.Done unit)
             else
               pure (MR.Loop step)
 
-    inst ∷ EventQueueInstance (Eff (QueueEffects eff)) i
+    inst ∷ EventQueueInstance Effect i
     inst = { run, push }
 
   step ← proc inst
-  writeRef machine (Just step)
+  Ref.write (Just step) machine
   pure inst

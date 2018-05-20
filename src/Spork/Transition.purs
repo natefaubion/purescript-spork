@@ -3,7 +3,8 @@ module Spork.Transition
   , purely
   ) where
 
-import Data.Monoid (mempty)
+import Prelude
+
 import Spork.Batch (Batch)
 
 type Transition m s i =

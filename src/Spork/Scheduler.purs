@@ -4,35 +4,31 @@ module Spork.Scheduler
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Ref (REF, modifyRef, newRef, readRef, writeRef)
-import DOM (DOM)
-import DOM.HTML (window) as DOM
-import DOM.HTML.Types (htmlDocumentToDocument) as DOM
-import DOM.HTML.Window (document) as DOM
-import DOM.Node.Document (createTextNode) as DOM
-import DOM.Node.MutationObserver (mutationObserver, observe) as DOM
-import DOM.Node.Node (setNodeValue) as DOM
-import DOM.Node.Types (textToNode) as DOM
 import Data.Either (Either(..), either)
 import Data.Foldable (traverse_)
+import Effect (Effect)
+import Effect.Ref as Ref
+import Web.DOM.Document (createTextNode) as DOM
+import Web.DOM.MutationObserver (mutationObserver, observe) as DOM
+import Web.DOM.Node (setNodeValue) as DOM
+import Web.DOM.Text (toNode) as DOM
+import Web.HTML (window) as DOM
+import Web.HTML.HTMLDocument (toDocument) as DOM
+import Web.HTML.Window (document) as DOM
 
-makeImmediate
-  ∷ ∀ eff
-  . Eff (ref ∷ REF, dom ∷ DOM | eff) Unit
-  → Eff (ref ∷ REF, dom ∷ DOM | eff) (Eff (ref ∷ REF, dom ∷ DOM | eff) Unit)
+makeImmediate ∷ Effect Unit → Effect (Effect Unit)
 makeImmediate run = do
   document ←
     DOM.window
       >>= DOM.document
-      >>> map DOM.htmlDocumentToDocument
-  nextTick ← newRef (Right 0)
-  obsvNode ← DOM.textToNode <$> DOM.createTextNode "" document
+      >>> map DOM.toDocument
+  nextTick ← Ref.new (Right 0)
+  obsvNode ← DOM.toNode <$> DOM.createTextNode "" document
   observer ← DOM.mutationObserver \_ _ → do
-    modifyRef nextTick $ either (Right <<< add 1) Right
+    Ref.modify (either (Right <<< add 1) Right) nextTick
     run
   DOM.observe obsvNode { characterData: true } observer
   pure do
-    readRef nextTick >>= traverse_ \tick → do
-      writeRef nextTick $ Left (tick + 1)
+    Ref.read nextTick >>= traverse_ \tick → do
+      Ref.write (Left (tick + 1)) nextTick
       DOM.setNodeValue (show tick) obsvNode

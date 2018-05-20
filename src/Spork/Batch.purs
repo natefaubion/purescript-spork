@@ -8,7 +8,6 @@ module Spork.Batch
 import Prelude
 
 import Data.Functor.Compose (Compose(..))
-import Data.Monoid (class Monoid)
 
 -- | A type for Batching effects/subscriptions.
 newtype Batch f a = Batch (Compose Array f a)

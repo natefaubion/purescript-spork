@@ -10,12 +10,12 @@ module Spork.Html.Thunk
   ) where
 
 import Prelude
+
 import Data.Function.Uncurried as Fn
-import DOM (DOM)
-import DOM.Node.Types (Node) as DOM
 import Halogen.VDom as V
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (reallyUnsafeRefEq)
+import Web.DOM.Node (Node)
 
 foreign import data TArg ∷ Type
 
@@ -45,7 +45,7 @@ instance functorThunk ∷ Functor f ⇒ Functor (Thunk f) where
 
 thunk ∷ ∀ a f i. Fn.Fn4 TId (a → a → Boolean) (a → f i) a (Thunk f i)
 thunk = Fn.mkFn4 \tid eqFn f a → toThunk
-  { mapk: id
+  { mapk: identity
   , id: tid
   , eq: unsafeCoerce eqFn ∷ TArg → TArg → Boolean
   , render: unsafeCoerce f ∷ TArg → f i
@@ -82,10 +82,10 @@ unsafeEqThunk = unThunk \tr1 → unThunk \tr2 →
   reallyUnsafeRefEq tr1.eq tr2.eq && reallyUnsafeRefEq tr1.id tr2.id && tr2.eq tr1.arg tr2.arg
 
 buildThunk
-  ∷ ∀ eff f i a w
+  ∷ ∀ f i a w
   . (f i → V.VDom a w)
-  → V.VDomSpec (dom ∷ DOM | eff) a w
-  → V.VDomMachine (dom ∷ DOM | eff) (Thunk f i) DOM.Node
+  → V.VDomSpec a w
+  → V.VDomMachine (Thunk f i) Node
 buildThunk toVDom spec = render
   where
     render t = do

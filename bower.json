@@ -16,23 +16,28 @@
     "output"
   ],
   "dependencies": {
-    "purescript-prelude": "^3.1.0",
-    "purescript-console": "^3.0.0",
-    "purescript-tailrec": "^3.3.0",
-    "purescript-arrays": "^4.1.0",
-    "purescript-refs": "^3.0.0",
-    "purescript-foldable-traversable": "^3.4.0",
-    "purescript-maybe": "^3.0.0",
-    "purescript-aff": "^4.0.0",
-    "purescript-halogen-vdom": "^2.0.0",
-    "purescript-dom-indexed": "^4.0.0",
-    "purescript-unsafe-reference": "^2.0.0",
-    "purescript-dom": "^4.15.0"
+    "purescript-prelude": "#compiler/0.12",
+    "purescript-console": "#compiler/0.12",
+    "purescript-tailrec": "#compiler/0.12",
+    "purescript-arrays": "#compiler/0.12",
+    "purescript-refs": "#compiler/0.12",
+    "purescript-foldable-traversable": "#compiler/0.12",
+    "purescript-maybe": "#compiler/0.12",
+    "purescript-aff": "#compiler/0.12",
+    "purescript-halogen-vdom": "#compiler/0.12",
+    "purescript-dom-indexed": "#compiler/0.12",
+    "purescript-unsafe-reference": "#compiler/0.12",
+    "purescript-web-dom": "#compiler/0.12",
+    "purescript-web-html": "#compiler/0.12",
+    "purescript-web-events": "#compiler/0.12",
+    "purescript-web-uievents": "#compiler/0.12",
+    "purescript-effect": "#compiler/0.12",
+    "purescript-foreign": "#compiler/0.12",
+    "purescript-foreign-object": "#compiler/0.12"
   },
   "devDependencies": {
-    "purescript-psci-support": "^3.0.0",
-    "purescript-dom-classy": "^2.1.0",
-    "purescript-simple-json": "^1.0.0",
-    "purescript-routing": "^7.0.0"
+    "purescript-psci-support": "#compiler/0.12",
+    "purescript-simple-json": "#compiler/0.12",
+    "purescript-routing": "#compiler/0.12"
   }
 }
