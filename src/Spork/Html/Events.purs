@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Foreign (Foreign, toForeign, F)
+import Foreign (Foreign, unsafeToForeign, F)
 import Foreign (readBoolean, readInt, readString) as F
 import Foreign.Index (readProp) as F
 import Spork.Html.Core (IProp, on)
@@ -142,7 +142,7 @@ foreignHandler ∷ ∀ a r i. ForeignDecoder a → String → (a → Maybe i) �
 foreignHandler decoder ty handler = on ty handler'
   where
     handler' ev =
-      case runExcept (decoder (toForeign ev)) of
+      case runExcept (decoder (unsafeToForeign ev)) of
         Left _  → Nothing
         Right a → handler a
 

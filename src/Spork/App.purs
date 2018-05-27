@@ -19,6 +19,7 @@ import Data.Newtype (unwrap)
 import Effect (Effect, foreachE)
 import Effect.Exception (throwException, error)
 import Effect.Ref as Ref
+import Effect.Uncurried as EFn
 import Foreign.Object as FO
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
@@ -91,7 +92,7 @@ type AppState m q s i =
   { model ∷ s
   , status ∷ RenderStatus
   , interpret ∷ Loop Effect (Coproduct m q i)
-  , vdom ∷ Machine.Step Effect (V.VDom (Array (P.Prop i)) (Thunk Html i)) DOM.Node
+  , vdom ∷ Machine.Step (V.VDom (Array (P.Prop i)) (Thunk Html i)) DOM.Node
   }
 
 makeAppQueue
@@ -150,7 +151,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
           nextState = state { model = nextModel, status = status }
         pure nextState
       Render → do
-        vdom ← Machine.step state.vdom (unwrap (app.render state.model))
+        vdom ← EFn.runEffectFn1 (Machine.step state.vdom) (unwrap (app.render state.model))
         pure $ state { vdom = vdom, status = Flushed }
 
     commit
@@ -175,7 +176,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
       , buildWidget: buildThunk unwrap
       , buildAttributes: P.buildProp (\a → pushAction a *> self.run)
       }
-  vdom ← V.buildVDom vdomSpec (unwrap (app.render app.init.model))
+  vdom ← EFn.runEffectFn1 (V.buildVDom vdomSpec) (unwrap (app.render app.init.model))
   void $ DOM.appendChild (Machine.extract vdom) el
   interpret ← interpreter (self { push = self.push <<< Action })
   foreachE (unBatch app.init.effects) pushEffect
@@ -230,7 +231,7 @@ make interpreter app el = do
 
     remove ∷ String → Effect Unit
     remove key =
-      subsRef # Ref.modify \subs → subs
+      subsRef # Ref.modify_ \subs → subs
         { cbs = FO.delete key subs.cbs
         }
 

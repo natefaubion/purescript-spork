@@ -107,7 +107,7 @@ fix proc = do
 
   let
     push ∷ i → Effect Unit
-    push = flip Ref.modify queue <<< flip Array.snoc
+    push = flip Ref.modify_ queue <<< flip Array.snoc
 
     run ∷ Effect Unit
     run = traverse_ loop =<< (Ref.read machine <* Ref.write Nothing machine)

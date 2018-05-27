@@ -12,6 +12,7 @@ module Spork.Html.Thunk
 import Prelude
 
 import Data.Function.Uncurried as Fn
+import Effect.Uncurried as EFn
 import Halogen.VDom as V
 import Unsafe.Coerce (unsafeCoerce)
 import Unsafe.Reference (reallyUnsafeRefEq)
@@ -85,16 +86,17 @@ buildThunk
   ∷ ∀ f i a w
   . (f i → V.VDom a w)
   → V.VDomSpec a w
-  → V.VDomMachine (Thunk f i) Node
+  → V.Machine (Thunk f i) Node
 buildThunk toVDom spec = render
   where
-    render t = do
-      res@V.Step n _ h ← V.buildVDom spec (toVDom (runThunk t))
-      pure (V.Step n (patch res t) h)
+    render = EFn.mkEffectFn1 \t → do
+      res@V.Step n _ h ← EFn.runEffectFn1 (V.buildVDom spec) (toVDom (runThunk t))
+      pure (V.Step n (Fn.runFn2 patch res t) h)
 
-    patch (prev@V.Step n step h) t t' = do
-      if unsafeEqThunk t t'
-        then pure (V.Step n (patch prev t) h)
-        else do
-          res@V.Step n' _ h' ← step (toVDom (runThunk t'))
-          pure (V.Step n' (patch res t') h')
+    patch = Fn.mkFn2 \(prev@V.Step n step h) t →
+      EFn.mkEffectFn1 \t' → do
+        if unsafeEqThunk t t'
+          then pure (V.Step n (Fn.runFn2 patch prev t) h)
+          else do
+            res@V.Step n' _ h' ← EFn.runEffectFn1 step (toVDom (runThunk t'))
+            pure (V.Step n' (Fn.runFn2 patch res t') h')

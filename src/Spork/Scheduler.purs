@@ -25,7 +25,7 @@ makeImmediate run = do
   nextTick ← Ref.new (Right 0)
   obsvNode ← DOM.toNode <$> DOM.createTextNode "" document
   observer ← DOM.mutationObserver \_ _ → do
-    Ref.modify (either (Right <<< add 1) Right) nextTick
+    Ref.modify_ (either (Right <<< add 1) Right) nextTick
     run
   DOM.observe obsvNode { characterData: true } observer
   pure do
