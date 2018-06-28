@@ -14,13 +14,13 @@ import Prelude
 import Data.Const (Const)
 import Data.Foldable (for_)
 import Data.Functor.Coproduct (Coproduct, left, right)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect (Effect, foreachE)
 import Effect.Exception (throwException, error)
 import Effect.Ref as Ref
 import Effect.Uncurried as EFn
-import Foreign.Object as FO
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.Machine as Machine
@@ -208,7 +208,7 @@ make
   → DOM.Node
   → Effect (AppInstance model action)
 make interpreter app el = do
-  subsRef ← Ref.new { fresh: 0, cbs: FO.empty }
+  subsRef ← Ref.new { fresh: 0, cbs: Map.empty }
   stateRef ← Ref.new app.init.model
   let
     handleChange ∷ AppChange model action → Effect Unit
@@ -222,17 +222,16 @@ make interpreter app el = do
       → (Effect (Effect Unit))
     subscribe' cb = do
       subs ← Ref.read subsRef
-      let key = show subs.fresh
       subsRef # Ref.write
         { fresh: subs.fresh + 1
-        , cbs: FO.insert key cb subs.cbs
+        , cbs: Map.insert subs.fresh cb subs.cbs
         }
-      pure (remove key)
+      pure (remove subs.fresh)
 
-    remove ∷ String → Effect Unit
+    remove ∷ Int → Effect Unit
     remove key =
       subsRef # Ref.modify_ \subs → subs
-        { cbs = FO.delete key subs.cbs
+        { cbs = Map.delete key subs.cbs
         }
 
   { push, run } ←

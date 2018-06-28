@@ -33,7 +33,7 @@
     "purescript-web-uievents": "^1.0.0",
     "purescript-effect": "^2.0.0",
     "purescript-foreign": "^5.0.0",
-    "purescript-foreign-object": "^1.0.0"
+    "purescript-ordered-collections": "^1.0.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^4.0.0",
