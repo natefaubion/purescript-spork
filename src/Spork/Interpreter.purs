@@ -4,20 +4,20 @@ module Spork.Interpreter
   , never
   , liftNat
   , liftCont
-  , basicEff
+  , basicEffect
   , basicAff
   , throughAff
   ) where
 
 import Prelude
 
-import Control.Monad.Aff (Aff, runAff)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Exception (Error)
 import Data.Const (Const)
 import Data.Either (either)
 import Data.Functor.Coproduct (Coproduct, coproduct)
 import Data.Newtype (unwrap)
+import Effect (Effect)
+import Effect.Aff (Aff, runAff)
+import Effect.Exception (Error)
 import Spork.EventQueue (EventQueue, Loop(..), stepper, withCont)
 
 -- | An Interpreter takes inputs embedded in some functor `f` and pushes them
@@ -57,17 +57,17 @@ liftNat ∷  ∀ f m i. Monad m ⇒ (f ~> m) → Interpreter m f i
 liftNat k = Interpreter (stepper k)
 
 -- | Runs `Eff` effects.
-basicEff ∷ ∀ eff i. Interpreter (Eff eff) (Eff eff) i
-basicEff = liftNat id
+basicEffect ∷ ∀ i. Interpreter Effect Effect i
+basicEffect = liftNat identity
 
 -- | Builds an Interpreter from callbacks.
 liftCont ∷ ∀ f m i. Applicative m ⇒ (∀ j. (j → m Unit) → f j → m Unit) → Interpreter m f i
 liftCont k =  Interpreter (withCont \queue → k \j → queue.push j *> queue.run)
 
 -- | Runs `Aff` effects. Takes a callback for handling exceptions.
-basicAff ∷ ∀ eff i. (Error → Eff eff Unit) → Interpreter (Eff eff) (Aff eff) i
-basicAff = throughAff id
+basicAff ∷ ∀ i. (Error → Effect Unit) → Interpreter Effect Aff i
+basicAff = throughAff identity
 
 -- | Interprets some functor `f` into `Aff` before running it.
-throughAff ∷ ∀ eff f i. (f ~> Aff eff) → (Error → Eff eff Unit) → Interpreter (Eff eff) f i
+throughAff ∷ ∀ f i. (f ~> Aff) → (Error → Effect Unit) → Interpreter Effect f i
 throughAff nat err = liftCont (\k → void <<< runAff (either err k) <<< nat)

@@ -2,10 +2,10 @@ module Subs.Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
 import Data.Const (Const)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Monoid (guard, mempty)
+import Data.Monoid (guard)
+import Effect (Effect)
 import Spork.App as App
 import Spork.Html as H
 import Spork.Interpreter (merge, never)
@@ -76,7 +76,7 @@ app =
   , init: App.purely initialModel
   }
 
-main ∷ Eff (App.AppEffects ()) Unit
+main ∷ Effect Unit
 main = do
   inst ←
     App.makeWithSelector

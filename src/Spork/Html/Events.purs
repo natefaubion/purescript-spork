@@ -1,16 +1,20 @@
 module Spork.Html.Events where
 
 import Prelude
+
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
-import Data.Foreign (Foreign, toForeign, F)
-import Data.Foreign (readBoolean, readInt, readString) as F
-import Data.Foreign.Index (readProp) as F
 import Data.Maybe (Maybe(..))
-import DOM.Event.Types (Event, MouseEvent, KeyboardEvent, FocusEvent)
-import DOM.HTML.Event.Types (DragEvent)
-import Spork.Html.Core (on, IProp)
+import Foreign (Foreign, unsafeToForeign, F)
+import Foreign (readBoolean, readInt, readString) as F
+import Foreign.Index (readProp) as F
+import Spork.Html.Core (IProp, on)
 import Unsafe.Coerce (unsafeCoerce)
+import Web.Event.Event (Event)
+import Web.HTML.Event.DragEvent (DragEvent)
+import Web.UIEvent.FocusEvent (FocusEvent)
+import Web.UIEvent.KeyboardEvent (KeyboardEvent)
+import Web.UIEvent.MouseEvent (MouseEvent)
 
 always ∷ ∀ i a. (a → i) → a → Maybe i
 always = compose Just
@@ -138,7 +142,7 @@ foreignHandler ∷ ∀ a r i. ForeignDecoder a → String → (a → Maybe i) �
 foreignHandler decoder ty handler = on ty handler'
   where
     handler' ev =
-      case runExcept (decoder (toForeign ev)) of
+      case runExcept (decoder (unsafeToForeign ev)) of
         Left _  → Nothing
         Right a → handler a
 

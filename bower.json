@@ -16,23 +16,29 @@
     "output"
   ],
   "dependencies": {
-    "purescript-prelude": "^3.1.0",
-    "purescript-console": "^3.0.0",
-    "purescript-tailrec": "^3.3.0",
-    "purescript-arrays": "^4.1.0",
-    "purescript-refs": "^3.0.0",
-    "purescript-foldable-traversable": "^3.4.0",
-    "purescript-maybe": "^3.0.0",
-    "purescript-aff": "^4.0.0",
-    "purescript-halogen-vdom": "^2.0.0",
-    "purescript-dom-indexed": "^4.0.0",
-    "purescript-unsafe-reference": "^2.0.0",
-    "purescript-dom": "^4.15.0"
+    "purescript-prelude": "^4.0.0",
+    "purescript-console": "^4.0.0",
+    "purescript-tailrec": "^4.0.0",
+    "purescript-arrays": "^5.0.0",
+    "purescript-refs": "^4.1.0",
+    "purescript-foldable-traversable": "^4.0.0",
+    "purescript-maybe": "^4.0.0",
+    "purescript-aff": "^5.0.0",
+    "purescript-halogen-vdom": "^4.0.0",
+    "purescript-dom-indexed": "^6.0.0",
+    "purescript-unsafe-reference": "^3.0.0",
+    "purescript-web-dom": "^1.0.0",
+    "purescript-web-html": "^1.0.0",
+    "purescript-web-events": "^1.0.0",
+    "purescript-web-uievents": "^1.0.0",
+    "purescript-effect": "^2.0.0",
+    "purescript-foreign": "^5.0.0",
+    "purescript-ordered-collections": "^1.0.0"
   },
   "devDependencies": {
-    "purescript-psci-support": "^3.0.0",
-    "purescript-dom-classy": "^2.1.0",
-    "purescript-simple-json": "^1.0.0",
-    "purescript-routing": "^7.0.0"
+    "purescript-psci-support": "^4.0.0",
+    "purescript-simple-json": "^4.0.0",
+    "purescript-routing": "^8.0.0",
+    "purescript-web-storage": "^2.0.0"
   }
 }

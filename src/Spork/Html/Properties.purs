@@ -4,8 +4,7 @@ module Spork.Html.Properties
   ) where
 
 import Prelude
-import Data.MediaType (MediaType(..)) as I
-import Data.String as String
+
 import DOM.HTML.Indexed (CSSPixel) as I
 import DOM.HTML.Indexed.ButtonType (ButtonType(..)) as I
 import DOM.HTML.Indexed.CrossOriginValue (CrossOriginValue(..)) as I
@@ -13,15 +12,17 @@ import DOM.HTML.Indexed.DirValue (DirValue(..)) as I
 import DOM.HTML.Indexed.FormMethod (FormMethod(..)) as I
 import DOM.HTML.Indexed.InputType (InputType(..)) as I
 import DOM.HTML.Indexed.KindValue (KindValue(..)) as I
-import DOM.HTML.Indexed.MenuitemType (MenuitemType(..)) as I
 import DOM.HTML.Indexed.MenuType (MenuType(..)) as I
+import DOM.HTML.Indexed.MenuitemType (MenuitemType(..)) as I
 import DOM.HTML.Indexed.OnOff (OnOff(..)) as I
 import DOM.HTML.Indexed.OrderedListType (OrderedListType(..)) as I
 import DOM.HTML.Indexed.PreloadValue (PreloadValue(..)) as I
 import DOM.HTML.Indexed.ScopeValue (ScopeValue(..)) as I
 import DOM.HTML.Indexed.StepValue (StepValue(..)) as I
 import DOM.HTML.Indexed.WrapValue (WrapValue(..)) as I
-import Spork.Html.Core (IProp, class ToPropValue)
+import Data.MediaType (MediaType(..)) as I
+import Data.String as String
+import Spork.Html.Core (class ToPropValue, IProp)
 import Spork.Html.Core as Html
 
 data Style = Style String String

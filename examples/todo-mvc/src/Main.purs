@@ -2,30 +2,27 @@ module Todo.Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
 import Control.MonadZero (guard)
-import DOM (DOM)
-import DOM.Classy.Element (fromElement) as DOM
-import DOM.Event.KeyboardEvent (key) as DOM
-import DOM.Event.Types (KeyboardEvent) as DOM
-import DOM.HTML (window) as DOM
-import DOM.HTML.HTMLElement (focus) as DOM
-import DOM.HTML.Window (localStorage) as DOM
-import DOM.Node.Types (Element) as DOM
-import DOM.WebStorage.Storage (getItem, setItem) as DOM
 import Data.Array as Array
 import Data.Const (Const)
 import Data.Either (hush)
 import Data.Foldable as F
 import Data.Maybe (Maybe(..))
-import Data.Monoid (mempty)
 import Data.Tuple (Tuple(..))
+import Effect (Effect)
 import Routing.Hash (hashes)
 import Simple.JSON (readJSON, writeJSON)
 import Spork.App as App
 import Spork.Html as H
 import Spork.Html.Elements.Keyed as K
 import Spork.Interpreter (liftNat, merge, never)
+import Web.DOM.Element (Element) as DOM
+import Web.HTML (window) as DOM
+import Web.HTML.HTMLElement (focus) as DOM
+import Web.HTML.HTMLElement as HTMLElement
+import Web.HTML.Window (localStorage) as DOM
+import Web.UIEvent.KeyboardEvent (KeyboardEvent, key) as Event
+import Web.Storage.Storage (getItem, setItem) as Storage
 
 type Model =
   { todos ∷ Array Todo
@@ -81,13 +78,13 @@ newTodo = { text: _, id: _, completed: false, editing: false }
 modifyWhere ∷ forall f a. Functor f ⇒ (a → Boolean) → (a → a) → f a → f a
 modifyWhere pred mod = map (\a → if pred a then mod a else a)
 
-toStorage ∷ Model → App.Transition Effect Model Action
+toStorage ∷ Model → App.Transition TodoEffect Model Action
 toStorage model =
   { model
   , effects: App.lift (WriteStorage model None)
   }
 
-update ∷ Model → Action → App.Transition Effect Model Action
+update ∷ Model → Action → App.Transition TodoEffect Model Action
 update model = case _ of
   None →
     App.purely model
@@ -361,9 +358,9 @@ infoFooter =
         ]
     ]
 
-onEnter ∷ forall i r. i → H.IProp (onKeyDown ∷ DOM.KeyboardEvent | r) i
+onEnter ∷ forall i r. i → H.IProp (onKeyDown ∷ Event.KeyboardEvent | r) i
 onEnter a = H.onKeyDown \ev →
-  if DOM.key ev == "Enter"
+  if Event.key ev == "Enter"
     then Just a
     else Nothing
 
@@ -373,7 +370,7 @@ styleHidden =
     then H.styles [ H.Style "visibility" "hidden" ]
     else H.styles [ H.Style "visibility" "visibility" ]
 
-app ∷ Maybe StoredModel → App.App Effect (Const Void) Model Action
+app ∷ Maybe StoredModel → App.App TodoEffect (Const Void) Model Action
 app storedModel =
   { render
   , update
@@ -396,16 +393,16 @@ type StoredModel =
 storageKey ∷ String
 storageKey = "todos"
 
-data Effect a
+data TodoEffect a
   = Focus DOM.Element a
   | WriteStorage Model a
 
-derive instance functorEffect ∷ Functor Effect
+derive instance functorTodoEffect ∷ Functor TodoEffect
 
-runEffect ∷ forall eff. Effect ~> Eff (dom ∷ DOM | eff)
-runEffect = case _ of
+runTodoEffect ∷ TodoEffect ~> Effect
+runTodoEffect = case _ of
   Focus el next → do
-    F.for_ (DOM.fromElement el) DOM.focus
+    F.for_ (HTMLElement.fromElement el) DOM.focus
     pure next
   WriteStorage model next → do
     let
@@ -415,7 +412,7 @@ runEffect = case _ of
         }
     DOM.window
       >>= DOM.localStorage
-      >>= DOM.setItem storageKey (writeJSON storedModel)
+      >>= Storage.setItem storageKey (writeJSON storedModel)
     pure next
 
 routeAction ∷ String → Maybe Action
@@ -425,17 +422,17 @@ routeAction = case _ of
   "/completed" → Just $ ChangeVisibility Completed
   _            → Nothing
 
-main ∷ Eff (App.AppEffects ()) Unit
+main ∷ Effect Unit
 main = do
   storedModel ←
     DOM.window
       >>= DOM.localStorage
-      >>= DOM.getItem storageKey
+      >>= Storage.getItem storageKey
       >>> map (_ >>= readJSON >>> hush)
 
   inst ←
     App.makeWithSelector
-      (liftNat runEffect `merge` never)
+      (liftNat runTodoEffect `merge` never)
       (app storedModel)
       "#app"
   inst.run

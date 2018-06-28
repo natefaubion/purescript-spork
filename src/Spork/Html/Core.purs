@@ -23,34 +23,35 @@ module Spork.Html.Core
   ) where
 
 import Prelude
-import Data.Bifunctor (bimap)
-import Data.Function.Uncurried as Fn
-import Data.Maybe (Maybe(..))
-import Data.MediaType (MediaType)
-import Data.Newtype (class Newtype, unwrap)
-import Data.Tuple (Tuple)
-import DOM.Event.Types (EventType(..), Event) as DOM
+
 import DOM.HTML.Indexed.ButtonType (ButtonType, renderButtonType)
 import DOM.HTML.Indexed.CrossOriginValue (CrossOriginValue, renderCrossOriginValue)
 import DOM.HTML.Indexed.DirValue (DirValue, renderDirValue)
 import DOM.HTML.Indexed.FormMethod (FormMethod, renderFormMethod)
 import DOM.HTML.Indexed.InputType (InputType, renderInputType)
 import DOM.HTML.Indexed.KindValue (KindValue, renderKindValue)
-import DOM.HTML.Indexed.MenuitemType (MenuitemType, renderMenuitemType)
 import DOM.HTML.Indexed.MenuType (MenuType, renderMenuType)
+import DOM.HTML.Indexed.MenuitemType (MenuitemType, renderMenuitemType)
 import DOM.HTML.Indexed.OnOff (OnOff, renderOnOff)
 import DOM.HTML.Indexed.OrderedListType (OrderedListType, renderOrderedListType)
 import DOM.HTML.Indexed.PreloadValue (PreloadValue, renderPreloadValue)
 import DOM.HTML.Indexed.ScopeValue (ScopeValue, renderScopeValue)
 import DOM.HTML.Indexed.StepValue (StepValue, renderStepValue)
 import DOM.HTML.Indexed.WrapValue (WrapValue, renderWrapValue)
-import DOM.Node.Types (Element) as DOM
+import Data.Bifunctor (bimap)
+import Data.Function.Uncurried as Fn
+import Data.Maybe (Maybe(..))
+import Data.MediaType (MediaType)
+import Data.Newtype (class Newtype, unwrap)
+import Data.Tuple (Tuple)
 import Halogen.VDom as V
-import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.DOM.Prop (ElemRef(..)) as Exports
+import Halogen.VDom.DOM.Prop as P
+import Halogen.VDom.Thunk (Thunk, thunk1, thunk2, thunk3, thunked)
 import Halogen.VDom.Types (Namespace(..)) as Exports
-import Spork.Html.Thunk (Thunk, thunked, thunk1, thunk2, thunk3)
 import Unsafe.Coerce (unsafeCoerce)
+import Web.DOM.Element (Element) as DOM
+import Web.Event.Event (EventType(..), Event) as DOM
 
 type HtmlV i = V.VDom (Array (P.Prop i)) (Thunk Html i)
 
@@ -143,7 +144,9 @@ elemWithNS ∷ ∀ r i. Maybe Exports.Namespace → String → Array (IProp r i)
 elemWithNS ns name props children =
   Html
     (V.Elem
-      (V.ElemSpec ns (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
+      ns
+      (V.ElemName name)
+      (unsafeCoerce props ∷ Array (P.Prop i))
       (unwrapF children))
 
 keyed ∷ ∀ r i. String → Array (IProp r i) → Array (Tuple String (Html i)) → Html i
@@ -153,7 +156,9 @@ keyedWithNS ∷ ∀ r i. Maybe Exports.Namespace → String → Array (IProp r i
 keyedWithNS ns name props children =
   Html
     (V.Keyed
-      (V.ElemSpec ns (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
+      ns
+      (V.ElemName name)
+      (unsafeCoerce props ∷ Array (P.Prop i))
       (unwrapG children))
 
 prop ∷ ∀ r i a. ToPropValue a ⇒ String → a → IProp r i
