@@ -47,8 +47,8 @@ import Data.Tuple (Tuple)
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop (ElemRef(..)) as Exports
 import Halogen.VDom.DOM.Prop as P
+import Halogen.VDom.Thunk (Thunk, thunk1, thunk2, thunk3, thunked)
 import Halogen.VDom.Types (Namespace(..)) as Exports
-import Spork.Html.Thunk (Thunk, thunk1, thunk2, thunk3, thunked)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (Element) as DOM
 import Web.Event.Event (EventType(..), Event) as DOM
@@ -144,7 +144,9 @@ elemWithNS ∷ ∀ r i. Maybe Exports.Namespace → String → Array (IProp r i)
 elemWithNS ns name props children =
   Html
     (V.Elem
-      (V.ElemSpec ns (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
+      ns
+      (V.ElemName name)
+      (unsafeCoerce props ∷ Array (P.Prop i))
       (unwrapF children))
 
 keyed ∷ ∀ r i. String → Array (IProp r i) → Array (Tuple String (Html i)) → Html i
@@ -154,7 +156,9 @@ keyedWithNS ∷ ∀ r i. Maybe Exports.Namespace → String → Array (IProp r i
 keyedWithNS ns name props children =
   Html
     (V.Keyed
-      (V.ElemSpec ns (V.ElemName name) (unsafeCoerce props ∷ Array (P.Prop i)))
+      ns
+      (V.ElemName name)
+      (unsafeCoerce props ∷ Array (P.Prop i))
       (unwrapG children))
 
 prop ∷ ∀ r i a. ToPropValue a ⇒ String → a → IProp r i

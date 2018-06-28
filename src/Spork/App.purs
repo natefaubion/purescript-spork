@@ -24,11 +24,11 @@ import Foreign.Object as FO
 import Halogen.VDom as V
 import Halogen.VDom.DOM.Prop as P
 import Halogen.VDom.Machine as Machine
+import Halogen.VDom.Thunk (Thunk, buildThunk)
 import Spork.Batch (Batch, batch, unBatch, lift)
 import Spork.EventQueue (EventQueue, Loop(..))
 import Spork.EventQueue as EventQueue
 import Spork.Html (Html)
-import Spork.Html.Thunk (Thunk, buildThunk)
 import Spork.Interpreter (Interpreter(..))
 import Spork.Scheduler (makeImmediate)
 import Spork.Transition (purely, Transition)
@@ -151,7 +151,7 @@ makeAppQueue onChange (Interpreter interpreter) app el = EventQueue.withAccum \s
           nextState = state { model = nextModel, status = status }
         pure nextState
       Render → do
-        vdom ← EFn.runEffectFn1 (Machine.step state.vdom) (unwrap (app.render state.model))
+        vdom ← EFn.runEffectFn2 Machine.step state.vdom (unwrap (app.render state.model))
         pure $ state { vdom = vdom, status = Flushed }
 
     commit

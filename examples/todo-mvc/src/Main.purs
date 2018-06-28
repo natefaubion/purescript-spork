@@ -22,7 +22,7 @@ import Web.HTML.HTMLElement (focus) as DOM
 import Web.HTML.HTMLElement as HTMLElement
 import Web.HTML.Window (localStorage) as DOM
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, key) as Event
-import Web.WebStorage.Storage (getItem, setItem) as Storage
+import Web.Storage.Storage (getItem, setItem) as Storage
 
 type Model =
   { todos ∷ Array Todo

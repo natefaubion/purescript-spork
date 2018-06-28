@@ -24,7 +24,7 @@
     "purescript-foldable-traversable": "^4.0.0",
     "purescript-maybe": "^4.0.0",
     "purescript-aff": "^5.0.0",
-    "purescript-halogen-vdom": "^3.0.0",
+    "purescript-halogen-vdom": "^4.0.0",
     "purescript-dom-indexed": "^6.0.0",
     "purescript-unsafe-reference": "^3.0.0",
     "purescript-web-dom": "^1.0.0",
@@ -37,7 +37,8 @@
   },
   "devDependencies": {
     "purescript-psci-support": "^4.0.0",
-    "purescript-simple-json": "^3.0.0",
-    "purescript-routing": "^7.1.0"
+    "purescript-simple-json": "^4.0.0",
+    "purescript-routing": "^8.0.0",
+    "purescript-web-storage": "^2.0.0"
   }
 }
