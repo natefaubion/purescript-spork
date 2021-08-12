@@ -3,7 +3,7 @@
 [![Latest release](http://img.shields.io/github/release/natefaubion/purescript-spork.svg)](https://github.com/natefaubion/purescript-spork/releases)
 [![Build status](https://travis-ci.org/natefaubion/purescript-spork.svg?branch=master)](https://travis-ci.org/natefaubion/purescript-spork)
 
-An Elm-like for PureScript. No `npm` dependencies required.
+An Elm-like application framework for PureScript. No `npm` dependencies required.
 
 ## Try before you buy
 
